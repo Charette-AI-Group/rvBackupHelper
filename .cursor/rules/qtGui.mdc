@@ -1,0 +1,47 @@
+---
+description: PySide6 GUI patterns and threading
+globs: "src/**/ui/**/*.py,src/**/main.py"
+alwaysApply: false
+---
+
+# Qt / PySide6 GUI Rules
+
+## Threading (critical)
+
+- GUI thread: widgets, paint, user input only.
+- Never block with file I/O, network, or heavy loops on the GUI thread.
+- Use `QThread` + signals or `QThreadPool` + `QRunnable`; emit results via signals.
+
+```python
+class Worker(QObject):
+    finished = Signal(str)
+
+    def run(self) -> None:
+        self.finished.emit(doWork())
+```
+
+## Widget design
+
+- One main window or dialog class per camelCase file under `ui/`.
+- Widget attributes: camelCase (`self.statusLabel`, `self.openButton`).
+- Connect signals in `__init__` or `_connectSignals()`.
+- Business logic: call `services/` from slots; keep widgets thin.
+- Disable buttons / show progress during long operations.
+
+## Structure
+
+- `main.py`: create `QApplication`, apply style, show `MainWindow`, `exec()`.
+- Reusable controls → `ui/widgets/`.
+- Modal flows → `ui/dialogs/`.
+
+## PySide6 specifics
+
+- Prefer `PySide6` imports (`from PySide6.QtWidgets import ...`).
+- Use `Signal` / `Slot` from `PySide6.QtCore`.
+- Resource paths live in `appConfig.py`.
+
+## Do not
+
+- Put SQL, HTTP, or parsing inside `QWidget` subclasses.
+- Use `time.sleep()` in the GUI thread.
+- Create mega-widgets over ~500 lines—split into sub-widgets.

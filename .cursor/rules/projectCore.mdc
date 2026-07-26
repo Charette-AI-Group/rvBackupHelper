@@ -1,0 +1,37 @@
+---
+description: Core project conventions for solo Qt Python apps
+alwaysApply: true
+---
+
+# Solo Qt App — Core Conventions
+
+- Maintainer: solo developer; optimize for clarity over enterprise ceremony.
+- Stack: Python 3.14+, PySide6, pytest, pytest-qt, ruff.
+- Read `AGENTS.md` before structural changes.
+
+## Naming
+
+- Files: camelCase (`mainWindow.py`, `appConfig.py`).
+- Variables, functions, methods, widget names: camelCase.
+- Classes: PascalCase.
+- User-visible UI text: Title Case with spaces (not camelCase).
+
+## Layout
+
+- Entry: `src/<app>/main.py` (thin launcher only).
+- UI: `src/<app>/ui/` — widgets and dialogs only.
+- Logic: `src/<app>/services/` — no Qt widget imports.
+- Data: `src/<app>/models/` — plain Python types.
+- Config: `src/<app>/appConfig.py`.
+
+## Before writing code
+
+1. Choose the correct layer (ui / services / models).
+2. Prefer a new camelCase file in the right folder over growing a large file.
+3. Split any file approaching 500 lines.
+
+## Changes
+
+- Minimal diff: do not refactor unrelated code.
+- Match existing camelCase naming in the repo.
+- Update `README.md` if user-visible behavior or run instructions change.
