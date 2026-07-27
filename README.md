@@ -98,6 +98,30 @@ pytest
 ruff check src tests
 ```
 
+## Arduino toolchain (optional, for checking generated sketches)
+
+With these installed, the test suite compiles the generated sketch for a real Uno; without
+them that one test skips itself.
+
+```powershell
+winget install --id ArduinoSA.CLI --exact
+```
+
+Then the AVR core and the enhanced TVout library the shield needs — note this is a fork, and
+the stock TVout will not work:
+
+```powershell
+arduino-cli core install arduino:avr
+```
+
+Clone <https://github.com/nootropicdesign/arduino-tvout-ve> and copy its `TVout`,
+`TVoutfonts` and `pollserial` folders into `Documents\Arduino\libraries`. To compile a sketch
+by hand:
+
+```powershell
+arduino-cli compile --fqbn arduino:avr:uno arduino/rvbhGrid
+```
+
 ## Structure
 
 | Layer | Folder | Purpose |

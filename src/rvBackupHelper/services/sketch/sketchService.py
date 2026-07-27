@@ -57,9 +57,11 @@ sketchTemplate = Template(
  *                  picture is vertically jumpy
  *
  * NOTE ON MEMORY
- *   The $canvasWidth x $canvasHeight frame buffer takes $bufferBytes of the Uno's 2048
- *   bytes of SRAM. There is room for the grid below, but move the labels into
- *   PROGMEM if you add many more.
+ *   TVout mallocs the frame buffer inside begin(): ($canvasWidth / 8) x $canvasHeight
+ *   = $bufferBytes bytes taken at runtime from the Uno's 2048. The compiler's
+ *   "global variables" figure does NOT include it, so ignore how roomy that
+ *   looks - only around 300 bytes are left for the stack. Move the labels
+ *   into PROGMEM before adding many more lines.
  */
 
 #include <TVout.h>
@@ -82,11 +84,27 @@ $gridRows
 const uint8_t GRID_COUNT = sizeof(GRID) / sizeof(GRID[0]);
 
 void setup() {
-  tv.begin(NTSC, W, H);
+  pinMode(LED_BUILTIN, OUTPUT);
+  // begin() returns non-zero when the frame buffer will not fit. Without it
+  // nothing can be drawn, and the failure is otherwise silent: the shield
+  // still passes the camera through, so the driver just sees no grid.
+  if (tv.begin(NTSC, W, H) != 0) {
+    blinkForever();
+  }
   initOverlay();
   tv.select_font(font4x6);
   tv.fill(0);
   drawGrid();
+}
+
+// Visible distress signal on the on-board LED, which the shield leaves free.
+void blinkForever() {
+  for (;;) {
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(200);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(200);
+  }
 }
 
 // Hand the timer and INT0 to the shield so the buffer rides on the incoming

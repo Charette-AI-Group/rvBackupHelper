@@ -133,10 +133,25 @@ self-contained once it leaves this repo.
 - **Watch for OSD row collisions.** Capture is 480 tall against the shield's 96, so distances
   within about 5 scan lines rescale onto the same row and cannot be drawn apart. The panel
   warns before generating.
-- **SRAM is the real constraint.** The 136x96 buffer is 1632 of the Uno's 2048 bytes. A
-  handful of grid lines fits; many more would need the labels in PROGMEM.
-- Not yet verified by a real compile — `arduino-cli` is not installed on the desktop, and the
-  sketch has not been flashed. Structure is covered by tests, but first flash is still ahead.
+- **SRAM is the real constraint, and the compiler hides it.** `TVout::begin()` *mallocs* the
+  frame buffer at runtime — `(136/8) x 96 = 1632` bytes — so it never appears in the "global
+  variables" figure. A clean build reports 89 bytes used and 1959 free, which looks roomy and
+  is not: about 300 bytes remain for the stack once `begin()` runs. Move the labels into
+  PROGMEM before adding many more lines.
+- **`begin()` returns non-zero if that malloc fails**, and the failure is otherwise silent —
+  the shield passes video through regardless, so the driver just sees no grid. The generated
+  sketch checks it and blinks the on-board LED forever instead, which the shield leaves free.
+
+### Verified by a real compile
+
+`arduino-cli` 1.5.1 is installed on the office desktop (winget `ArduinoSA.CLI`), with the
+`arduino:avr` core and the three TVout-VE libraries in `Documents\Arduino\libraries`. The
+generated sketch builds clean for `arduino:avr:uno`: 6552 bytes of flash (20%).
+
+`tests/testServices/testSketchCompiles.py` runs that compile as part of the suite and skips
+itself when the toolchain is absent, so it does not break a machine without it. **The laptop
+will need the same three installs before the RV trip.** Still unverified: nothing has been
+flashed to real hardware yet.
 
 ## Repo layout beyond the template
 
