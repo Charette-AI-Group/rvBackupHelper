@@ -9,7 +9,7 @@ appVersion = "0.1.0"
 organizationName = "Charette AI Group"
 
 # Help > About contents
-editorName = "Francois Charette"
+editorName = "Francois Charette, PhD"
 aiAgentName = "Claude - Fable 5"
 copyrightHolder = "Charette AI Group, LLC"
 
@@ -65,3 +65,10 @@ overlayCanvasHeight = 96
 minimumDistanceFeet = 0.5
 maximumDistanceFeet = 200.0
 defaultDistanceFeet = 3.0
+
+# --- Arduino sketch ------------------------------------------------------
+
+# The Arduino IDE requires a sketch to sit in a folder of the same name.
+arduinoDir = projectRoot / "arduino"
+sketchName = "rvbhGrid"
+sketchExtension = ".ino"

@@ -194,6 +194,50 @@ def testSavingNothingIsRefused(view: CalibrationView, monkeypatch) -> None:
     assert "Nothing to save" in messages[-1]
 
 
+def testSketchButtonNeedsPoints(view: CalibrationView) -> None:
+    assert not view.sketchButton.isEnabled()
+
+
+def testGeneratingASketchWritesACompilableFile(
+    viewWithClip: CalibrationView, tmp_path: Path, monkeypatch
+) -> None:
+    target = tmp_path / "rvbhGrid" / "rvbhGrid.ino"
+    viewWithClip.distanceSpin.setValue(3.0)
+    viewWithClip.onFramePointClicked(320, 430)
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName", staticmethod(lambda *args: (str(target), ""))
+    )
+
+    assert viewWithClip.sketchButton.isEnabled()
+    viewWithClip.onGenerateSketchClicked()
+
+    sketch = target.read_text(encoding="utf-8")
+    assert "#include <TVout.h>" in sketch
+    assert '{  86, "3 ft" }' in sketch
+    assert "clip.avi" in sketch
+
+
+def testCollidingRowsAreWarnedAboutBeforeGenerating(
+    viewWithClip: CalibrationView,
+) -> None:
+    """Two distances on one OSD row cannot be drawn apart; say so up front."""
+    viewWithClip.distanceSpin.setValue(3.0)
+    viewWithClip.onFramePointClicked(320, 430)
+    viewWithClip.distanceSpin.setValue(4.0)
+    viewWithClip.onFramePointClicked(320, 428)
+
+    assert "share an OSD row" in viewWithClip.summaryLabel.text()
+
+
+def testNoCollisionWarningWhenRowsAreDistinct(viewWithClip: CalibrationView) -> None:
+    viewWithClip.distanceSpin.setValue(3.0)
+    viewWithClip.onFramePointClicked(320, 430)
+    viewWithClip.distanceSpin.setValue(6.0)
+    viewWithClip.onFramePointClicked(320, 372)
+
+    assert "share an OSD row" not in viewWithClip.summaryLabel.text()
+
+
 def testLoadingABrokenFileReportsItAndKeepsState(
     viewWithClip: CalibrationView, tmp_path: Path, monkeypatch
 ) -> None:

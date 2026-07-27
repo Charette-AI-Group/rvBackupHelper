@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "sourceClip": "rvbh-20260727-104905.avi",
+  "frameIndex": 256,
+  "frameWidth": 640,
+  "frameHeight": 480,
+  "overlayCanvasWidth": 136,
+  "overlayCanvasHeight": 96,
+  "points": [
+    {
+      "distanceFeet": 0.5,
+      "scanLine": 477,
+      "overlayRow": 95
+    },
+    {
+      "distanceFeet": 3.0,
+      "scanLine": 406,
+      "overlayRow": 81
+    },
+    {
+      "distanceFeet": 4.5,
+      "scanLine": 371,
+      "overlayRow": 74
+    },
+    {
+      "distanceFeet": 6.0,
+      "scanLine": 323,
+      "overlayRow": 65
+    }
+  ]
+}

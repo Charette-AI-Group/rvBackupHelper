@@ -118,6 +118,26 @@ Two things that bit during implementation and are pinned by tests:
 - **`ClipBrowser.showFrame()` goes through the slider**, otherwise the transport controls end
   up contradicting the position label.
 
+## Sketch generation
+
+**Generate Arduino Sketch…** renders the calibration into `arduino/rvbhGrid/rvbhGrid.ino`
+(the `.ino` must sit in a folder of the same name — an Arduino IDE requirement). Committed,
+not ignored. The header repeats the board, library and jumper requirements so the sketch is
+self-contained once it leaves this repo.
+
+- **Lines are drawn full width, deliberately.** The calibration measures vertical mapping
+  only, so tapering them for perspective would imply a width nobody measured. Vehicle-width
+  guides would need horizontal calibration — marking the left and right edges of a known
+  width at each distance — which the tool does not collect yet. That is the obvious next
+  feature if the plain lines prove insufficient in use.
+- **Watch for OSD row collisions.** Capture is 480 tall against the shield's 96, so distances
+  within about 5 scan lines rescale onto the same row and cannot be drawn apart. The panel
+  warns before generating.
+- **SRAM is the real constraint.** The 136x96 buffer is 1632 of the Uno's 2048 bytes. A
+  handful of grid lines fits; many more would need the labels in PROGMEM.
+- Not yet verified by a real compile — `arduino-cli` is not installed on the desktop, and the
+  sketch has not been flashed. Structure is covered by tests, but first flash is still ahead.
+
 ## Repo layout beyond the template
 
 - `src/rvBackupHelper/` — the PySide6 app (capture, review, calibration UI). Standard template layout.

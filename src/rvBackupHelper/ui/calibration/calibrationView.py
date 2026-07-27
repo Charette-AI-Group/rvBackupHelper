@@ -33,11 +33,17 @@ from rvBackupHelper.services.calibration.calibrationService import (
     CalibrationService,
     defaultCalibrationPath,
 )
+from rvBackupHelper.services.sketch.sketchService import (
+    SketchError,
+    SketchService,
+    defaultSketchPath,
+)
 from rvBackupHelper.ui.widgets.clipBrowser import ClipBrowser
 
 logger = logging.getLogger(__name__)
 
 calibrationFilter = "Calibration files (*.json);;All files (*)"
+sketchFilter = "Arduino sketches (*.ino);;All files (*)"
 panelWidth = 320
 instructions = (
     "Open the clip you recorded behind the RV and step to the frame where your "
@@ -54,8 +60,10 @@ class CalibrationView(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.service = CalibrationService()
+        self.sketchService = SketchService()
         self.calibration = Calibration()
         self.calibrationPath: Path | None = None
+        self.sketchPath: Path | None = None
         self.buildUi()
         self.refresh()
 
@@ -115,11 +123,15 @@ class CalibrationView(QWidget):
         self.saveButton = QPushButton("Save...")
         self.saveButton.clicked.connect(self.onSaveClicked)
 
+        self.sketchButton = QPushButton("Generate Arduino Sketch...")
+        self.sketchButton.clicked.connect(self.onGenerateSketchClicked)
+
         buttons = QGridLayout()
         buttons.addWidget(self.removeButton, 0, 0)
         buttons.addWidget(self.clearButton, 0, 1)
         buttons.addWidget(self.loadButton, 1, 0)
         buttons.addWidget(self.saveButton, 1, 1)
+        buttons.addWidget(self.sketchButton, 2, 0, 1, 2)
 
         self.summaryLabel = QLabel()
         self.summaryLabel.setWordWrap(True)
@@ -213,6 +225,29 @@ class CalibrationView(QWidget):
         )
         self.refresh()
 
+    def onGenerateSketchClicked(self) -> None:
+        if self.calibration.isEmpty:
+            self.statusMessage.emit("Nothing to generate yet - mark a distance first.")
+            return
+        suggested = self.sketchPath or defaultSketchPath()
+        suggested.parent.mkdir(parents=True, exist_ok=True)
+        fileName, _ = QFileDialog.getSaveFileName(
+            self, "Generate Arduino Sketch", str(suggested), sketchFilter
+        )
+        if not fileName:
+            return
+        path = Path(fileName)
+        try:
+            self.sketchService.save(self.calibration, path)
+        except (SketchError, OSError) as exc:
+            logger.warning("Could not generate sketch: %s", exc)
+            self.statusMessage.emit(f"Could not generate sketch: {exc}")
+            return
+        self.sketchPath = path
+        self.statusMessage.emit(
+            f"Wrote {len(self.calibration.points)} grid line(s) to {path.name}"
+        )
+
     def onLoadClicked(self) -> None:
         startDir = self.calibrationPath or defaultCalibrationPath()
         fileName, _ = QFileDialog.getOpenFileName(
@@ -261,16 +296,27 @@ class CalibrationView(QWidget):
             return
         frame = f"{self.calibration.frameWidth}x{self.calibration.frameHeight}"
         overlay = f"{appConfig.overlayCanvasWidth}x{appConfig.overlayCanvasHeight}"
-        self.summaryLabel.setText(
+        summary = (
             f"{len(self.calibration.points)} point(s) measured on a {frame} frame. "
             f"OSD rows are for the {overlay} shield canvas."
         )
+        # The canvas is several times shorter than the capture, so close
+        # distances can rescale onto one row and become undrawable.
+        collisions = self.sketchService.collidingRows(self.calibration)
+        if collisions:
+            crowded = "; ".join(
+                " and ".join(point.label for point in points)
+                for points in collisions.values()
+            )
+            summary += f" Warning: {crowded} share an OSD row - the shield cannot separate them."
+        self.summaryLabel.setText(summary)
 
     def updateControls(self) -> None:
         hasPoints = not self.calibration.isEmpty
         self.removeButton.setEnabled(self.selectedDistance() is not None)
         self.clearButton.setEnabled(hasPoints)
         self.saveButton.setEnabled(hasPoints)
+        self.sketchButton.setEnabled(hasPoints)
 
     # ----------------------------------------------------------- shutdown --
 

@@ -77,6 +77,20 @@ because a scan line only means a distance relative to the height it was measured
 Precision note: clicks are accurate to about a scan line, and the picture is normally scaled
 down to fit the window — maximise the window before marking if you want the tightest reading.
 
+**Generate Arduino Sketch…** turns the calibration into a ready-to-flash `.ino`
+(default `arduino/rvbhGrid/rvbhGrid.ino`), with each measured distance as a `GRID[]` row and
+the scan line it came from in a trailing comment. The header carries the provenance — source
+clip, frame, capture size, timestamp — plus the board, library and shield-jumper requirements,
+so the sketch stands on its own away from this repo.
+
+The panel warns before generating if two distances land on the same OSD row: the capture is
+five times taller than the shield's canvas, so distances a few scan lines apart can collapse
+onto one row that the hardware cannot draw apart.
+
+The lines run the full width of the picture. Tapering them to suggest perspective would imply
+a width that has not been measured — the calibration records vertical mapping only. Vehicle-width
+guides would need horizontal calibration, which the tool does not yet collect.
+
 ## Tests and lint
 
 ```powershell
