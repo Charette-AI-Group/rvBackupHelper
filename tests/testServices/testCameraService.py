@@ -134,7 +134,10 @@ def testDeviceWithNoSignalIsStillListed() -> None:
     assert device.label == "USB Video"
     assert not device.hasSignal
     assert (device.frameWidth, device.frameHeight) == (720, 576)
-    assert device.displayName == "USB Video (720x576, no signal)"
+    assert device.displayName == "USB Video (720x576, no video)"
+    # The short label cannot say why; the detail must name both causes.
+    assert "no video is reaching it" in device.statusDetail
+    assert "another application" in device.statusDetail
 
 
 def testDeviceNoBackendCanOpenIsSkipped() -> None:

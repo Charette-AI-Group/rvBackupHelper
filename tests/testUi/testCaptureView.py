@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Qt, Signal
 
 from rvBackupHelper.models.captureModels import CameraDevice
 from rvBackupHelper.ui.capture.captureView import CaptureView, startupHint
@@ -73,8 +73,22 @@ def testDeviceListShowsNamesAndSignalState(qtbot) -> None:
     labels = [view.deviceCombo.itemText(i) for i in range(view.deviceCombo.count())]
     assert labels == [
         "HD Pro Webcam C920 (640x480)",
-        "USB Video (640x480, no signal)",
+        "USB Video (640x480, no video)",
     ]
+
+
+def testSignallessDeviceCarriesAnExplanatoryTooltip(qtbot) -> None:
+    """A device holding no video could be idle or held by another app."""
+    view = CaptureView()
+    qtbot.addWidget(view)
+
+    view.onDevicesFound([liveDevice, signallessDevice])
+
+    liveTip = view.deviceCombo.itemData(0, Qt.ItemDataRole.ToolTipRole)
+    signallessTip = view.deviceCombo.itemData(1, Qt.ItemDataRole.ToolTipRole)
+
+    assert liveTip == ""
+    assert "another application" in signallessTip
 
 
 def testSelectedDeviceCarriesItsBackend(qtbot) -> None:
@@ -135,7 +149,10 @@ def testSignalLossUpdatesThePreviewPlaceholder(qtbot) -> None:
     view.onSignalStateChanged(False)
 
     assert not view.videoDisplay.hasFrame
-    assert "Waiting for a video signal" in messages[-1]
+    assert "device in use" in view.videoDisplay.placeholderText
+    # Both causes named, so nobody hunts a dead camera that is merely busy.
+    assert "powered" in messages[-1]
+    assert "other application" in messages[-1]
 
     view.onSignalStateChanged(True)
-    assert "acquired" in messages[-1]
+    assert "Video arriving" in messages[-1]

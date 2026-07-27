@@ -44,6 +44,14 @@ Hard-won facts about reaching them from OpenCV on Windows — all measured, not 
   which also covers an RV camera wired to reverse gear that only powers up when you shift.
 - `OBS Virtual Camera` also enumerates but cannot be opened unless OBS is running, so it is
   filtered out of the device list.
+- **Only one application can hold the grabber at a time.** This cost real debugging time
+  once: OBS was running and showing the feed, so the video was obviously fine, yet the app
+  reported no frames. Media Foundation still *opened* the device — it just never received
+  anything, because OBS owned the stream. Closing OBS fixed it instantly, and the grabber
+  then opened on DirectShow with video, cutting the scan to 2.4 s. **Do not leave OBS or any
+  video-call app running while using RVBH**, at the desk or in the RV.
+- Confirmed working end to end with a live composite source: 640x480 @ 30 fps, sixty frames
+  captured with zero empty reads and recorded to a readable clip.
 
 ## Chosen approach: analog OSD overlay, inline
 

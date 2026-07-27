@@ -139,7 +139,10 @@ def testWorkerGivesUpOnceTheSignalTimeoutPasses(qtbot) -> None:
     with qtbot.waitSignal(worker.errorOccurred, timeout=signalTimeout) as error:
         worker.start()
 
-    assert "No video signal" in error.args[0]
+    assert "No video" in error.args[0]
+    # The message must point at both causes, not just a dead camera.
+    assert "powered" in error.args[0]
+    assert "other application" in error.args[0]
     worker.wait(signalTimeout)
     assert camera.closed
 

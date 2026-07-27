@@ -130,8 +130,9 @@ class CaptureWorker(QThread):
             self.signalStateChanged.emit(False)
         if time.monotonic() - self.lastFrameAt > self.signalTimeoutSeconds:
             message = (
-                f"No video signal for {self.signalTimeoutSeconds:.0f} s - "
-                "is the camera connected and powered?"
+                f"No video for {self.signalTimeoutSeconds:.0f} s - check the camera "
+                "is connected and powered, and that no other application (such as "
+                "OBS) is using the device."
             )
             logger.warning(message)
             self.errorOccurred.emit(message)

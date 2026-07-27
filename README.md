@@ -29,11 +29,16 @@ Or just double-click **`runApp.cmd`** in the project folder (needs the one-time 
 
 ## Using the app
 
+> **Close OBS first.** Only one application can hold a capture device at a time. If OBS (or
+> a video-call app) is running with the grabber as a source, RVBH opens the device but
+> receives no frames — even though the video is plainly visible in OBS.
+
 **Capture tab** — press **Scan Devices** to find capture hardware. Devices are listed by
 their Windows name, so the grabber (`USB Video`) is easy to tell from a webcam. A device
-that opens but is not receiving video is listed as **no signal** rather than hidden — that
-is the normal state for a grabber with nothing plugged in. The scan opens and closes each
-device in turn and takes a few seconds; it runs off the GUI thread.
+that opens but is not receiving video is listed as **no video** rather than hidden; hover it
+for the reason, which is either nothing connected or another app holding the device. The
+scan opens and closes each device in turn and takes a few seconds; it runs off the GUI
+thread.
 
 Pick the device, press **Start Capture** for a live preview, and **Start Recording** to
 write a clip. Starting capture on a device with no signal is fine: the preview shows

@@ -5,15 +5,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+# A device that opens but sends nothing has two quite different causes, and
+# they are indistinguishable from the outside — so name both rather than
+# guessing. Most USB capture devices allow only one process to hold the
+# stream, so a running OBS or video-call app locks everyone else out.
+noVideoExplanation = (
+    "The device opened but sent no frames. Either no video is reaching it, or "
+    "another application (OBS, Teams, Zoom) is holding the device."
+)
+
 
 @dataclass(frozen=True)
 class CameraDevice:
     """A capture device that a backend was able to open.
 
-    `hasSignal` is False for a device that opens but sends no frames — a
-    capture dongle with nothing plugged into it. Those stay in the list on
-    purpose: the device is real and selectable, it is the video that is
-    missing.
+    `hasSignal` is False for a device that opens but sends no frames. Those
+    stay in the list on purpose: the device is real and selectable, it is the
+    video that is missing.
     """
 
     index: int
@@ -27,8 +35,13 @@ class CameraDevice:
     @property
     def displayName(self) -> str:
         size = f"{self.frameWidth}x{self.frameHeight}"
-        signal = "" if self.hasSignal else ", no signal"
+        signal = "" if self.hasSignal else ", no video"
         return f"{self.label} ({size}{signal})"
+
+    @property
+    def statusDetail(self) -> str:
+        """Longer explanation for a tooltip; empty when video is flowing."""
+        return "" if self.hasSignal else noVideoExplanation
 
 
 @dataclass(frozen=True)

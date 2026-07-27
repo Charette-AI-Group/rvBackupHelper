@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -120,8 +120,12 @@ class CaptureView(QWidget):
     def onDevicesFound(self, devices: list[CameraDevice]) -> None:
         self.devices = devices
         self.deviceCombo.clear()
-        for device in devices:
+        for position, device in enumerate(devices):
             self.deviceCombo.addItem(device.displayName, device)
+            # The short "no video" label cannot say why; the tooltip can.
+            self.deviceCombo.setItemData(
+                position, device.statusDetail, Qt.ItemDataRole.ToolTipRole
+            )
         if devices:
             self.statusMessage.emit(f"Found {len(devices)} capture device(s).")
             self.videoDisplay.clear("Ready - press Start Capture")
@@ -200,11 +204,12 @@ class CaptureView(QWidget):
 
     def onSignalStateChanged(self, hasSignal: bool) -> None:
         if hasSignal:
-            self.statusMessage.emit("Video signal acquired.")
+            self.statusMessage.emit("Video arriving.")
             return
-        self.videoDisplay.clear("Waiting for video signal...")
+        self.videoDisplay.clear("Waiting for video - no signal, or device in use")
         self.statusMessage.emit(
-            "Waiting for a video signal - is the camera connected and powered?"
+            "No frames yet - check the camera is connected and powered, and that "
+            "no other application (such as OBS) is using the device."
         )
 
     def onCaptureError(self, message: str) -> None:
