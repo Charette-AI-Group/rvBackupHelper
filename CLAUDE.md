@@ -150,8 +150,32 @@ generated sketch builds clean for `arduino:avr:uno`: 6552 bytes of flash (20%).
 
 `tests/testServices/testSketchCompiles.py` runs that compile as part of the suite and skips
 itself when the toolchain is absent, so it does not break a machine without it. **The laptop
-will need the same three installs before the RV trip.** Still unverified: nothing has been
-flashed to real hardware yet.
+will need the same three installs before the RV trip.**
+
+## Hardware bring-up — done, and it works
+
+Validated on the office desktop on 2026-07-27 with `arduino/rvbhBringUp/`, a hand-written
+diagnostic that draws a border, three labelled reference rows and a block sweeping along the
+bottom as proof the loop is running.
+
+- Board is a **genuine Arduino Uno on COM3**, auto-detected as `arduino:avr:uno`. No CH340
+  driver needed — that concern applies only to clones, so it stays on the laptop checklist.
+- Upload with `arduino-cli upload --port COM3 --fqbn arduino:avr:uno --verify`. Success is
+  quiet: it prints only `New upload port: COM3 (serial)` and exits 0. avrdude's progress
+  output needs `-v`; its absence is not a failure.
+- **The full chain is proven**: composite in → shield overlays the Arduino buffer → composite
+  out → USB grabber → the app. Confirmed by capturing the shield's own output through
+  `CameraService` and reading the overlay text off the frame.
+- The bring-up build is 7930 bytes of flash (24%) with the overlay path enabled.
+
+**The one trap worth remembering.** `USE_OVERLAY 0` free-runs its own sync. Flashed onto a rig
+wired for Overlay (SYNC SELECT on V INPUT, OUTPUT SELECT on Overlay) the pattern still appears
+but drifts against the incoming video — torn, doubled, with a wavy vertical tear. It reads as
+broken hardware and is not: setting `USE_OVERLAY 1` made it rock steady with no wiring change.
+Tearing means the build and the jumpers disagree.
+
+Still ahead: the calibrated grid sketch has been compiled but never flashed, and no real RV
+camera has been through the shield.
 
 ## Repo layout beyond the template
 
