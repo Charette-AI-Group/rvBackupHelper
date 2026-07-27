@@ -177,6 +177,34 @@ Tearing means the build and the jumpers disagree.
 Still ahead: the calibrated grid sketch has been compiled but never flashed, and no real RV
 camera has been through the shield.
 
+## Overlay jitter — what is and is not known
+
+The overlay wanders vertically by a few pixels. `tools/measureOverlayJitter.py` turns that
+into a number by tracking each horizontal line through a search window across ~150 captured
+frames. Lower is better.
+
+**The measurement is noisier than the things being measured.** Repeat runs of *identical*
+firmware on the bench source came out at 1.32, 2.72, 3.24, 3.37 and 5.51 px. So:
+
+- Any firmware comparison from a single pair of runs is worthless. Always repeat three or
+  four times, which is why the tool defaults to `--repeat 3`.
+- Static draw versus animated redraw, and `tv.delay_frame()` versus Arduino `delay()`, all
+  looked different in one-shot comparisons but none of those gaps survives the spread. The
+  static default is kept because it does no worse and matches the generated sketch, **not**
+  because it was shown to be better.
+- The whole overlay also sits a few pixels lower or higher from run to run, which points at
+  the incoming sync rather than at anything running on the Arduino.
+
+**Most likely dominant cause: the bench source.** The test footage is VHS-grade, and VHS
+timebase error is exactly this symptom. Two things would settle it, both physical:
+
+1. **Turn R4 up slightly** — the nootropic build notes name this as the fix for vertical
+   jumpiness, and it is the one lever nobody has touched yet. Measure, turn, measure again.
+2. **Run stage A with no video source at all** (`USE_OVERLAY 0`, SYNC SELECT on pin 9, OUTPUT
+   SELECT on Sync only). The Arduino then generates its own sync. If the jitter vanishes, the
+   source was responsible and the RV camera — crystal-locked, unlike a tape — should be far
+   steadier.
+
 ## Repo layout beyond the template
 
 - `src/rvBackupHelper/` — the PySide6 app (capture, review, calibration UI). Standard template layout.
