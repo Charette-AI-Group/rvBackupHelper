@@ -12,3 +12,6 @@ venv/
 .ruff_cache/
 .mypy_cache/
 *.ui.autosave
+
+# Captured video — large, and regenerated at the RV rather than shared.
+recordings/

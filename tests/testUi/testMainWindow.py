@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-
 from rvBackupHelper.ui.mainWindow import MainWindow
 
 
@@ -17,14 +15,12 @@ def testMainWindowOpens(qtbot) -> None:
     assert mainWindow.statusBar().currentMessage() == "Ready"
 
 
-def testGreetButtonUpdatesLabel(qtbot) -> None:
+def testCaptureAndReviewTabsArePresent(qtbot) -> None:
     mainWindow = MainWindow()
     qtbot.addWidget(mainWindow)
-    mainWindow.show()
 
-    qtbot.mouseClick(mainWindow.greetButton, Qt.MouseButton.LeftButton)
-
-    assert mainWindow.statusBar().currentMessage() == "Hello from RV Backup Helper"
+    tabTitles = [mainWindow.tabs.tabText(i) for i in range(mainWindow.tabs.count())]
+    assert tabTitles == ["Capture", "Review"]
 
 
 def testMenuBarStructure(qtbot) -> None:
@@ -35,24 +31,21 @@ def testMenuBarStructure(qtbot) -> None:
     assert menuTitles == ["&File", "&Help"]
 
     fileItems = [a.text() for a in mainWindow.fileMenu.actions() if not a.isSeparator()]
-    assert fileItems == ["&New", "&Open...", "&Save", "E&xit"]
+    assert fileItems == ["&Open Clip...", "E&xit"]
     assert any(a.isSeparator() for a in mainWindow.fileMenu.actions())
 
     assert [a.text() for a in mainWindow.helpMenu.actions()] == ["&About"]
 
 
-def testFileMenuPlaceholdersUpdateStatus(qtbot) -> None:
+def testViewStatusMessagesReachTheStatusBar(qtbot) -> None:
     mainWindow = MainWindow()
     qtbot.addWidget(mainWindow)
 
-    mainWindow.newAction.trigger()
-    assert mainWindow.statusBar().currentMessage() == "File > New selected"
+    mainWindow.captureView.statusMessage.emit("Capturing.")
+    assert mainWindow.statusBar().currentMessage() == "Capturing."
 
-    mainWindow.openAction.trigger()
-    assert mainWindow.statusBar().currentMessage() == "File > Open selected"
-
-    mainWindow.saveAction.trigger()
-    assert mainWindow.statusBar().currentMessage() == "File > Save selected"
+    mainWindow.reviewView.statusMessage.emit("Opened clip.avi")
+    assert mainWindow.statusBar().currentMessage() == "Opened clip.avi"
 
 
 def testAboutTextContents(qtbot) -> None:

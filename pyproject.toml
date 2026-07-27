@@ -5,6 +5,8 @@ description = "RV backup camera video capture, grid calibration and OSD overlay 
 requires-python = ">=3.14"
 dependencies = [
     "PySide6>=6.6,<7",
+    "numpy>=2.0,<3",
+    "opencv-python>=4.10,<5",
 ]
 
 [project.optional-dependencies]

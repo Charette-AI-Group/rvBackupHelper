@@ -27,6 +27,21 @@ python -m rvBackupHelper.main
 
 Or just double-click **`runApp.cmd`** in the project folder (needs the one-time setup done first).
 
+## Using the app
+
+**Capture tab** — press **Scan Devices** to probe for capture hardware (OpenCV has no
+enumeration API, so this opens and closes each device index in turn and takes a few
+seconds). Pick the grabber from the list, press **Start Capture** for a live preview,
+and **Start Recording** to write a clip.
+
+Clips land in `recordings/` as timestamped `.avi` files, MJPG encoded. MJPG compresses
+each frame on its own, so every frame decodes independently and seeking is frame-exact —
+which is what calibration measurements need. The folder is git-ignored.
+
+**Review tab** — open a clip and step through it with the slider, the frame spin box, or
+Previous/Next. A clip you just recorded is loaded here automatically. This is the
+calibration workhorse: find the frame where the measuring tape is readable and hold on it.
+
 ## Tests and lint
 
 ```powershell

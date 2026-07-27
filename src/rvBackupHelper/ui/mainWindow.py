@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import datetime
+from pathlib import Path
 
-from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import (
-    QMainWindow,
-    QMessageBox,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
+from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
 
 from rvBackupHelper import appConfig
+from rvBackupHelper.ui.capture.captureView import CaptureView
+from rvBackupHelper.ui.review.reviewView import ReviewView
 
 
 class MainWindow(QMainWindow):
@@ -22,38 +19,30 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(appConfig.windowTitle)
         self.resize(appConfig.defaultWindowWidth, appConfig.defaultWindowHeight)
 
+        self.captureView = CaptureView()
+        self.reviewView = ReviewView()
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self.captureView, "Capture")
+        self.tabs.addTab(self.reviewView, "Review")
+        self.setCentralWidget(self.tabs)
+
+        self.captureView.statusMessage.connect(self.showStatus)
+        self.reviewView.statusMessage.connect(self.showStatus)
+        self.captureView.clipRecorded.connect(self.onClipRecorded)
+
         self.buildMenuBar()
         self.statusBar().showMessage("Ready")
-
-        self.greetButton = QPushButton("Say Hello")
-        self.greetButton.clicked.connect(self.onGreetClicked)
-
-        centralWidget = QWidget()
-        layout = QVBoxLayout(centralWidget)
-        layout.addWidget(self.greetButton)
-        layout.addStretch()
-
-        self.setCentralWidget(centralWidget)
 
     def buildMenuBar(self) -> None:
         # Menus are kept as attributes: features can extend them later, and it
         # prevents the Python wrappers from being garbage-collected.
         fileMenu = self.fileMenu = self.menuBar().addMenu("&File")
 
-        self.newAction = QAction("&New", self)
-        self.newAction.setShortcut(QKeySequence.StandardKey.New)
-        self.newAction.triggered.connect(self.onFileNew)
-        fileMenu.addAction(self.newAction)
-
-        self.openAction = QAction("&Open...", self)
-        self.openAction.setShortcut(QKeySequence.StandardKey.Open)
-        self.openAction.triggered.connect(self.onFileOpen)
-        fileMenu.addAction(self.openAction)
-
-        self.saveAction = QAction("&Save", self)
-        self.saveAction.setShortcut(QKeySequence.StandardKey.Save)
-        self.saveAction.triggered.connect(self.onFileSave)
-        fileMenu.addAction(self.saveAction)
+        self.openClipAction = QAction("&Open Clip...", self)
+        self.openClipAction.setShortcut(QKeySequence.StandardKey.Open)
+        self.openClipAction.triggered.connect(self.onOpenClip)
+        fileMenu.addAction(self.openClipAction)
 
         fileMenu.addSeparator()
 
@@ -68,15 +57,16 @@ class MainWindow(QMainWindow):
         self.aboutAction.triggered.connect(self.onHelpAbout)
         helpMenu.addAction(self.aboutAction)
 
-    # Placeholder slots — replace the bodies with your app's file handling.
-    def onFileNew(self) -> None:
-        self.statusBar().showMessage("File > New selected")
+    def showStatus(self, message: str) -> None:
+        self.statusBar().showMessage(message)
 
-    def onFileOpen(self) -> None:
-        self.statusBar().showMessage("File > Open selected")
+    def onOpenClip(self) -> None:
+        self.tabs.setCurrentWidget(self.reviewView)
+        self.reviewView.onOpenClicked()
 
-    def onFileSave(self) -> None:
-        self.statusBar().showMessage("File > Save selected")
+    def onClipRecorded(self, path: Path) -> None:
+        """Load a just-finished recording so the Review tab is ready on switch."""
+        self.reviewView.openClip(path)
 
     def buildAboutText(self) -> str:
         year = datetime.date.today().year
@@ -96,5 +86,7 @@ class MainWindow(QMainWindow):
         aboutBox.setStyleSheet("QLabel { min-width: 420px; }")
         aboutBox.exec()
 
-    def onGreetClicked(self) -> None:
-        self.statusBar().showMessage("Hello from RV Backup Helper")
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self.captureView.shutdown()
+        self.reviewView.shutdown()
+        super().closeEvent(event)
