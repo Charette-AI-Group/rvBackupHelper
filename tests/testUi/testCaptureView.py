@@ -116,6 +116,29 @@ def testEmptyScanResultLeavesCaptureDisabled(qtbot) -> None:
     assert view.selectedDevice() is None
 
 
+class FakeCaptureWorker:
+    """Captures the path a recording request would have used."""
+
+    def __init__(self) -> None:
+        self.requestedPath = None
+
+    def requestRecordingStart(self, path) -> None:
+        self.requestedPath = path
+
+
+def testRecordingsGoToTheConfiguredFolder(qtbot, tmp_path) -> None:
+    view = CaptureView()
+    qtbot.addWidget(view)
+    view.setRecordingsDir(tmp_path)
+    worker = FakeCaptureWorker()
+    view.captureWorker = worker
+
+    view.onRecordClicked()
+
+    assert worker.requestedPath is not None
+    assert worker.requestedPath.parent == tmp_path
+
+
 def testStartsWithAHintTellingTheUserWhereToBegin(qtbot) -> None:
     view = CaptureView()
     qtbot.addWidget(view)

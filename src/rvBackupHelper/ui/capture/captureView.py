@@ -43,6 +43,7 @@ class CaptureView(QWidget):
         self.devices: list[CameraDevice] = []
         self.activeDevice: CameraDevice | None = None
         self.recordingPath: Path | None = None
+        self.recordingsDir = appConfig.recordingsDir
         self.buildUi()
         self.updateControls()
 
@@ -89,6 +90,10 @@ class CaptureView(QWidget):
 
     def selectedDevice(self) -> CameraDevice | None:
         return self.deviceCombo.currentData()
+
+    def setRecordingsDir(self, path: Path) -> None:
+        """Where the next clip is written. Takes effect on the next recording."""
+        self.recordingsDir = path
 
     def updateControls(self) -> None:
         hasDevice = self.deviceCombo.count() > 0
@@ -235,7 +240,7 @@ class CaptureView(QWidget):
         if self.isRecording:
             worker.requestRecordingStop()
         else:
-            worker.requestRecordingStart(buildClipPath())
+            worker.requestRecordingStart(buildClipPath(self.recordingsDir))
 
     def onRecordingStarted(self, path: Path) -> None:
         self.recordingPath = path

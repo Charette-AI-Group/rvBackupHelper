@@ -5,19 +5,31 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 
-from PySide6.QtGui import QAction, QCloseEvent, QKeySequence
-from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics, QKeySequence
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QTabWidget,
+)
 
 from rvBackupHelper import appConfig
+from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.ui.capture.captureView import CaptureView
 from rvBackupHelper.ui.review.reviewView import ReviewView
 
+# Pixel budget for the status-bar path before it is elided in the middle.
+recordingsLabelWidth = 420
+
 
 class MainWindow(QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, settingsService: SettingsService | None = None) -> None:
         super().__init__()
         self.setWindowTitle(appConfig.windowTitle)
         self.resize(appConfig.defaultWindowWidth, appConfig.defaultWindowHeight)
+        self.settingsService = settingsService or SettingsService()
 
         self.captureView = CaptureView()
         self.reviewView = ReviewView()
@@ -32,6 +44,15 @@ class MainWindow(QMainWindow):
         self.captureView.clipRecorded.connect(self.onClipRecorded)
 
         self.buildMenuBar()
+
+        # A permanent widget sits to the right and survives transient messages,
+        # so the save location stays visible while status text comes and goes.
+        self.recordingsLabel = QLabel()
+        # Keep clear of the size grip in the corner.
+        self.recordingsLabel.setContentsMargins(0, 0, 8, 0)
+        self.statusBar().addPermanentWidget(self.recordingsLabel)
+        self.applyRecordingsDir(self.settingsService.recordingsDir())
+
         self.statusBar().showMessage("Ready")
 
     def buildMenuBar(self) -> None:
@@ -43,6 +64,10 @@ class MainWindow(QMainWindow):
         self.openClipAction.setShortcut(QKeySequence.StandardKey.Open)
         self.openClipAction.triggered.connect(self.onOpenClip)
         fileMenu.addAction(self.openClipAction)
+
+        self.recordingsDirAction = QAction("&Recordings Folder...", self)
+        self.recordingsDirAction.triggered.connect(self.onChooseRecordingsDir)
+        fileMenu.addAction(self.recordingsDirAction)
 
         fileMenu.addSeparator()
 
@@ -63,6 +88,37 @@ class MainWindow(QMainWindow):
     def onOpenClip(self) -> None:
         self.tabs.setCurrentWidget(self.reviewView)
         self.reviewView.onOpenClicked()
+
+    def onChooseRecordingsDir(self) -> None:
+        chosen = QFileDialog.getExistingDirectory(
+            self, "Choose Recordings Folder", str(self.recordingsDir)
+        )
+        if not chosen:
+            return
+        path = Path(chosen)
+        self.settingsService.setRecordingsDir(path)
+        self.applyRecordingsDir(path)
+        self.showStatus(f"Recordings folder set to {path}")
+
+    def applyRecordingsDir(self, path: Path) -> None:
+        """Point both tabs and the status bar at the chosen folder."""
+        self.recordingsDir = path
+        self.captureView.setRecordingsDir(path)
+        self.reviewView.setRecordingsDir(path)
+        self.updateRecordingsLabel()
+
+    def updateRecordingsLabel(self) -> None:
+        # Elide in the middle: a deep path keeps its drive and its final folder,
+        # which is what identifies it at a glance.
+        metrics = QFontMetrics(self.recordingsLabel.font())
+        self.recordingsLabel.setText(
+            metrics.elidedText(
+                f"Recordings: {self.recordingsDir}",
+                Qt.TextElideMode.ElideMiddle,
+                recordingsLabelWidth,
+            )
+        )
+        self.recordingsLabel.setToolTip(str(self.recordingsDir))
 
     def onClipRecorded(self, path: Path) -> None:
         """Load a just-finished recording so the Review tab is ready on switch."""

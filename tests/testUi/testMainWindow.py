@@ -2,7 +2,22 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QFileDialog
+
+from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.ui.mainWindow import MainWindow
+
+
+@pytest.fixture
+def settingsService(tmp_path: Path) -> SettingsService:
+    """Isolated settings so tests never read or write real preferences."""
+    return SettingsService(
+        QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat)
+    )
 
 
 def testMainWindowOpens(qtbot) -> None:
@@ -31,7 +46,7 @@ def testMenuBarStructure(qtbot) -> None:
     assert menuTitles == ["&File", "&Help"]
 
     fileItems = [a.text() for a in mainWindow.fileMenu.actions() if not a.isSeparator()]
-    assert fileItems == ["&Open Clip...", "E&xit"]
+    assert fileItems == ["&Open Clip...", "&Recordings Folder...", "E&xit"]
     assert any(a.isSeparator() for a in mainWindow.fileMenu.actions())
 
     assert [a.text() for a in mainWindow.helpMenu.actions()] == ["&About"]
@@ -46,6 +61,88 @@ def testViewStatusMessagesReachTheStatusBar(qtbot) -> None:
 
     mainWindow.reviewView.statusMessage.emit("Opened clip.avi")
     assert mainWindow.statusBar().currentMessage() == "Opened clip.avi"
+
+
+def testRecordingsFolderIsShownPermanentlyInTheStatusBar(
+    qtbot, settingsService, tmp_path: Path
+) -> None:
+    chosen = tmp_path / "clips"
+    settingsService.setRecordingsDir(chosen)
+
+    mainWindow = MainWindow(settingsService=settingsService)
+    qtbot.addWidget(mainWindow)
+
+    assert "Recordings:" in mainWindow.recordingsLabel.text()
+    assert mainWindow.recordingsLabel.toolTip() == str(chosen)
+
+    # A transient status message must not wipe the location out.
+    mainWindow.showStatus("Capturing.")
+    assert mainWindow.statusBar().currentMessage() == "Capturing."
+    assert "Recordings:" in mainWindow.recordingsLabel.text()
+
+
+def testStoredRecordingsFolderReachesBothTabsOnStartup(
+    qtbot, settingsService, tmp_path: Path
+) -> None:
+    chosen = tmp_path / "storedClips"
+    settingsService.setRecordingsDir(chosen)
+
+    mainWindow = MainWindow(settingsService=settingsService)
+    qtbot.addWidget(mainWindow)
+
+    assert mainWindow.captureView.recordingsDir == chosen
+    assert mainWindow.reviewView.recordingsDir == chosen
+
+
+def testChoosingAFolderPersistsItAndUpdatesEverything(
+    qtbot, settingsService, tmp_path: Path, monkeypatch
+) -> None:
+    mainWindow = MainWindow(settingsService=settingsService)
+    qtbot.addWidget(mainWindow)
+    chosen = tmp_path / "newClips"
+    chosen.mkdir()
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", staticmethod(lambda *args: str(chosen))
+    )
+
+    mainWindow.onChooseRecordingsDir()
+
+    assert mainWindow.recordingsDir == chosen
+    assert mainWindow.captureView.recordingsDir == chosen
+    assert mainWindow.reviewView.recordingsDir == chosen
+    assert mainWindow.recordingsLabel.toolTip() == str(chosen)
+    assert str(chosen) in mainWindow.statusBar().currentMessage()
+    # Persisted, not just held in memory.
+    assert settingsService.recordingsDir() == chosen
+
+
+def testCancellingTheFolderDialogChangesNothing(
+    qtbot, settingsService, tmp_path: Path, monkeypatch
+) -> None:
+    mainWindow = MainWindow(settingsService=settingsService)
+    qtbot.addWidget(mainWindow)
+    before = mainWindow.recordingsDir
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", staticmethod(lambda *args: "")
+    )
+
+    mainWindow.onChooseRecordingsDir()
+
+    assert mainWindow.recordingsDir == before
+    assert mainWindow.captureView.recordingsDir == before
+
+
+def testLongFolderPathIsElidedButFullyAvailableOnHover(
+    qtbot, settingsService, tmp_path: Path
+) -> None:
+    deep = tmp_path.joinpath(*[f"averyLongFolderNameNumber{n}" for n in range(12)])
+    settingsService.setRecordingsDir(deep)
+
+    mainWindow = MainWindow(settingsService=settingsService)
+    qtbot.addWidget(mainWindow)
+
+    assert "…" in mainWindow.recordingsLabel.text()
+    assert mainWindow.recordingsLabel.toolTip() == str(deep)
 
 
 def testAboutTextContents(qtbot) -> None:

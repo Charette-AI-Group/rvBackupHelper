@@ -43,8 +43,13 @@ class ReviewView(QWidget):
         super().__init__(parent)
         self.reader = ClipReaderService()
         self.clipInfo: ClipInfo | None = None
+        self.recordingsDir = appConfig.recordingsDir
         self.buildUi()
         self.updateControls()
+
+    def setRecordingsDir(self, path: Path) -> None:
+        """Where the Open dialog starts looking."""
+        self.recordingsDir = path
 
     def buildUi(self) -> None:
         self.openButton = QPushButton("Open Clip...")
@@ -90,9 +95,7 @@ class ReviewView(QWidget):
 
     def onOpenClicked(self) -> None:
         startDir = (
-            appConfig.recordingsDir
-            if appConfig.recordingsDir.exists()
-            else appConfig.projectRoot
+            self.recordingsDir if self.recordingsDir.exists() else appConfig.projectRoot
         )
         fileName, _ = QFileDialog.getOpenFileName(
             self, "Open Clip", str(startDir), clipFilter

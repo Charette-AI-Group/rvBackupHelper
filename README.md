@@ -45,9 +45,16 @@ write a clip. Starting capture on a device with no signal is fine: the preview s
 "Waiting for video signal" and starts as soon as video arrives, which is what an RV camera
 powered only in reverse gear needs.
 
-Clips land in `recordings/` as timestamped `.avi` files, MJPG encoded. MJPG compresses
-each frame on its own, so every frame decodes independently and seeking is frame-exact —
-which is what calibration measurements need. The folder is git-ignored.
+Clips are timestamped `.avi` files, MJPG encoded. MJPG compresses each frame on its own,
+so every frame decodes independently and seeking is frame-exact — which is what calibration
+measurements need.
+
+They are written to `recordings/` inside the project by default, which is **git-ignored** so
+video never reaches GitHub. Change the destination with **File → Recordings Folder…**; the
+choice persists between sessions and the current location is always shown at the right-hand
+end of the status bar. Pointing it outside the project is the safer habit — no reliance on
+the ignore rule — and it is what you want on the laptop, where clips can go straight to an
+external drive.
 
 **Review tab** — open a clip and step through it with the slider, the frame spin box, or
 Previous/Next. A clip you just recorded is loaded here automatically. This is the
