@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QImage
 
 from rvBackupHelper.ui.widgets.videoDisplay import VideoDisplay, toQImage
@@ -96,6 +97,109 @@ def testHintIsNotPaintedOverAFrame(qtbot) -> None:
     display.clearHint()
 
     assert display.grab().toImage() == withHint
+
+
+def testFramePointMapsBackThroughTheLetterbox(qtbot) -> None:
+    """Calibration reads exact scan lines, so this must undo the scaling."""
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+    display.resize(800, 400)
+    display.showFrame(makeFrame(640, 480))  # 4:3 letterboxed into a 2:1 widget
+
+    rect = display.frameRect()
+    topLeft = display.toFramePoint(QPoint(rect.left(), rect.top()))
+    middle = display.toFramePoint(rect.center())
+
+    assert (topLeft.x(), topLeft.y()) == (0, 0)
+    assert middle.x() == pytest.approx(320, abs=2)
+    assert middle.y() == pytest.approx(240, abs=2)
+
+
+def testScanLinesSurviveTheScreenRoundTripUnbiased(qtbot) -> None:
+    """Draw a scan line on screen, click it, get the same scan line back.
+
+    Truncating instead of rounding here shifted every measured distance a pixel
+    low, which is exactly the error calibration exists to avoid.
+    """
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+    display.resize(700, 420)  # forces the 640x480 frame to scale down
+    display.showFrame(makeFrame(640, 480))
+    rect = display.frameRect()
+
+    drifts = []
+    for scanLine in (0, 100, 240, 299, 330, 372, 430, 479):
+        widgetY = rect.top() + round(scanLine * rect.height() / 480)
+        mapped = display.toFramePoint(QPoint(rect.center().x(), widgetY))
+        drifts.append(mapped.y() - scanLine)
+
+    # A scaled-down picture packs several scan lines into one widget row, so a
+    # pixel of scatter is the physical limit; a consistent lean is not.
+    assert all(abs(drift) <= 1 for drift in drifts), drifts
+    meanDrift = sum(drifts) / len(drifts)
+    assert abs(meanDrift) < 0.5, f"systematic bias of {meanDrift:+.2f} px: {drifts}"
+
+
+def testFramePointRejectsTheLetterboxMargins(qtbot) -> None:
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+    display.resize(800, 400)
+    display.showFrame(makeFrame(640, 480))
+
+    rect = display.frameRect()
+
+    # Left of the picture is dead space, not scan line 0.
+    assert display.toFramePoint(QPoint(rect.left() - 5, rect.center().y())) is None
+    assert display.toFramePoint(QPoint(rect.right() + 5, rect.center().y())) is None
+
+
+def testFramePointStaysInsideTheImageAtTheFarEdge(qtbot) -> None:
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+    display.resize(640, 480)
+    display.showFrame(makeFrame(640, 480))
+
+    rect = display.frameRect()
+    corner = display.toFramePoint(QPoint(rect.right(), rect.bottom()))
+
+    assert corner.x() <= 639
+    assert corner.y() <= 479
+
+
+def testFramePointIsNoneWithoutAFrame(qtbot) -> None:
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+    display.resize(400, 300)
+
+    assert display.toFramePoint(QPoint(200, 150)) is None
+
+
+def testClickingInsideTheFrameEmitsFrameCoordinates(qtbot) -> None:
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+    display.resize(640, 480)
+    display.showFrame(makeFrame(640, 480))
+    received: list[tuple[int, int]] = []
+    display.framePointClicked.connect(lambda x, y: received.append((x, y)))
+
+    rect = display.frameRect()
+    qtbot.mouseClick(
+        display, Qt.MouseButton.LeftButton, pos=QPoint(rect.left() + 10, rect.top() + 20)
+    )
+
+    assert received == [(10, 20)]
+
+
+def testMarkersAreDrawn(qtbot) -> None:
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+    display.resize(400, 300)
+    display.showFrame(makeFrame(400, 300, value=40))
+
+    withoutMarkers = display.grab().toImage()
+    display.setMarkers([(150, "3 ft")])
+
+    assert display.grab().toImage() != withoutMarkers
 
 
 def testFrameRectKeepsAspectRatioAndCentres(qtbot) -> None:

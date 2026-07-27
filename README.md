@@ -57,8 +57,25 @@ the ignore rule — and it is what you want on the laptop, where clips can go st
 external drive.
 
 **Review tab** — open a clip and step through it with the slider, the frame spin box, or
-Previous/Next. A clip you just recorded is loaded here automatically. This is the
-calibration workhorse: find the frame where the measuring tape is readable and hold on it.
+Previous/Next. A clip you just recorded is loaded here automatically.
+
+**Calibrate tab** — the same clip browser with a measurement panel. Open the clip you
+recorded behind the RV, step to the frame where your distance markers are readable, set a
+distance, then **click that marker in the image**. Each click records the scan line it landed
+on and draws an amber guide there, so you can see immediately whether it sits on the mark.
+
+The table shows three columns: the distance, the **scan line** in the captured frame, and the
+**OSD row** — the same line rescaled onto the shield's 136x96 canvas, which is the number the
+Arduino sketch needs. Re-marking a distance replaces the earlier point rather than stacking
+two guides, so correcting a misplaced click is just clicking again.
+
+**Save…** writes a small JSON file (default `calibration/rvbhCalibration.json`). That file is
+**not** git-ignored — it is the one artefact that can only be produced at the RV, so it
+belongs in version control. Opening a clip with a different frame size clears the points,
+because a scan line only means a distance relative to the height it was measured against.
+
+Precision note: clicks are accurate to about a scan line, and the picture is normally scaled
+down to fit the window — maximise the window before marking if you want the tightest reading.
 
 ## Tests and lint
 

@@ -1,7 +1,7 @@
-"""Review tab: step through a recorded clip frame by frame.
+"""Opens a recorded clip and steps through it frame by frame.
 
-This is the calibration workhorse — finding the one frame where the measuring
-tape is readable and holding on it.
+Shared by the Review tab and the Calibrate tab so the seek behaviour and the
+transport controls have exactly one implementation.
 """
 
 from __future__ import annotations
@@ -34,15 +34,21 @@ logger = logging.getLogger(__name__)
 clipFilter = "Video clips (*.avi *.mp4 *.mkv);;All files (*)"
 
 
-class ReviewView(QWidget):
-    """Opens a recorded clip and steps through it one frame at a time."""
+class ClipBrowser(QWidget):
+    """A clip, a frame of it, and the controls to move between frames."""
 
     statusMessage = Signal(str)
+    # Payload is the ClipInfo of a newly opened clip.
+    clipOpened = Signal(object)
+    # Payload is the index of the frame now on screen.
+    frameShown = Signal(int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.reader = ClipReaderService()
         self.clipInfo: ClipInfo | None = None
+        self.clipPath: Path | None = None
+        self.currentFrameIndex = 0
         self.recordingsDir = appConfig.recordingsDir
         self.buildUi()
         self.updateControls()
@@ -87,6 +93,7 @@ class ReviewView(QWidget):
         transport.addWidget(self.positionLabel)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.addLayout(header)
         layout.addWidget(self.videoDisplay, stretch=1)
         layout.addLayout(transport)
@@ -112,6 +119,7 @@ class ReviewView(QWidget):
             return
 
         self.clipInfo = clipInfo
+        self.clipPath = path
         lastIndex = max(clipInfo.frameCount - 1, 0)
         self.frameSlider.setRange(0, lastIndex)
         self.frameSpin.setRange(0, lastIndex)
@@ -121,6 +129,7 @@ class ReviewView(QWidget):
         )
         self.statusMessage.emit(f"Opened {path.name}")
         self.updateControls()
+        self.clipOpened.emit(clipInfo)
         self.showFrame(0)
 
     # --------------------------------------------------------- navigation --
@@ -129,7 +138,7 @@ class ReviewView(QWidget):
         self.frameSpin.blockSignals(True)
         self.frameSpin.setValue(value)
         self.frameSpin.blockSignals(False)
-        self.showFrame(value)
+        self.renderFrame(value)
 
     def onSpinChanged(self, value: int) -> None:
         self.frameSlider.setValue(value)
@@ -145,6 +154,23 @@ class ReviewView(QWidget):
         )
 
     def showFrame(self, frameIndex: int) -> None:
+        """Move to a frame, keeping the transport controls in step.
+
+        Going through the slider matters: rendering directly would leave the
+        slider and spin box pointing somewhere else, and the position label
+        would contradict them.
+        """
+        if self.clipInfo is None:
+            return
+        frameIndex = max(
+            self.frameSlider.minimum(), min(frameIndex, self.frameSlider.maximum())
+        )
+        if self.frameSlider.value() != frameIndex:
+            self.frameSlider.setValue(frameIndex)  # onSliderChanged renders it
+            return
+        self.renderFrame(frameIndex)
+
+    def renderFrame(self, frameIndex: int) -> None:
         if self.clipInfo is None:
             return
         try:
@@ -153,8 +179,10 @@ class ReviewView(QWidget):
             logger.warning("Could not read frame %d: %s", frameIndex, exc)
             self.statusMessage.emit(str(exc))
             return
+        self.currentFrameIndex = frameIndex
         self.videoDisplay.showFrame(frame)
         self.updatePositionLabel(frameIndex)
+        self.frameShown.emit(frameIndex)
 
     def updatePositionLabel(self, frameIndex: int) -> None:
         if self.clipInfo is None:

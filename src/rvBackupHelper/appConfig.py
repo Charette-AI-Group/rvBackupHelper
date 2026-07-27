@@ -47,3 +47,21 @@ signalRetrySeconds = 0.1
 # the smaller files an inter-frame codec would give.
 recordingFourcc = "MJPG"
 recordingExtension = ".avi"
+
+# --- Calibration ---------------------------------------------------------
+
+# Small JSON, and the one artefact that can only be produced at the RV, so it
+# is version controlled rather than ignored the way recordings are.
+calibrationDir = projectRoot / "calibration"
+calibrationExtension = ".json"
+defaultCalibrationName = f"rvbhCalibration{calibrationExtension}"
+
+# The Video Experimenter shield draws into a fixed monochrome buffer. Measured
+# scan lines are rescaled onto it to become rows in the Arduino sketch.
+overlayCanvasWidth = 136
+overlayCanvasHeight = 96
+
+# Sensible bounds for a distance entered while calibrating, in feet.
+minimumDistanceFeet = 0.5
+maximumDistanceFeet = 200.0
+defaultDistanceFeet = 3.0

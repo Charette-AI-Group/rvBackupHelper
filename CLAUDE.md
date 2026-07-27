@@ -98,10 +98,25 @@ pigtails that need splicing to RCA (composite is just signal + ground); power it
 
 ## Calibration — the artifact that only exists at the RV
 
-Lay a tape measure (or cones every 2 ft) straight back from the bumper, record the feed, and
-map real-world distances to scan lines. Store the result as a **data file under `calibration/`**
-that both the sketch generator and the Qt app read — never as magic numbers typed into a sketch.
-This cannot be reproduced at a desk and cannot be recovered from memory.
+Lay a tape measure (or cones every 2 ft) straight back from the bumper, record the feed, then
+use the **Calibrate tab**: step to the frame where the markers are readable, set a distance,
+and click that marker in the image. Each click records the scan line it landed on.
+
+Saved as JSON under `calibration/` (default `rvbhCalibration.json`), and deliberately **not**
+git-ignored the way `recordings/` is — this cannot be reproduced at a desk or recovered from
+memory, so it belongs in version control. Each point stores `distanceFeet`, `scanLine`, and
+`overlayRow`; the file also records `frameWidth`/`frameHeight`, because a scan line means
+nothing without the frame height it was measured against. `scanLine` plus `frameHeight`
+remains the source of truth — `overlayRow` is a convenience for readers that do not want to
+redo the arithmetic.
+
+Two things that bit during implementation and are pinned by tests:
+
+- **Round, do not truncate, when mapping a click back to a scan line.** The picture is
+  normally scaled down, so flooring picks the top of each band and biased every measurement a
+  pixel low — a systematic error in the exact number the feature exists to produce.
+- **`ClipBrowser.showFrame()` goes through the slider**, otherwise the transport controls end
+  up contradicting the position label.
 
 ## Repo layout beyond the template
 

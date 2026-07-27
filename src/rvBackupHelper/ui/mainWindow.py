@@ -17,8 +17,9 @@ from PySide6.QtWidgets import (
 
 from rvBackupHelper import appConfig
 from rvBackupHelper.services.settingsService import SettingsService
+from rvBackupHelper.ui.calibration.calibrationView import CalibrationView
 from rvBackupHelper.ui.capture.captureView import CaptureView
-from rvBackupHelper.ui.review.reviewView import ReviewView
+from rvBackupHelper.ui.widgets.clipBrowser import ClipBrowser
 
 # Pixel budget for the status-bar path before it is elided in the middle.
 recordingsLabelWidth = 420
@@ -32,15 +33,20 @@ class MainWindow(QMainWindow):
         self.settingsService = settingsService or SettingsService()
 
         self.captureView = CaptureView()
-        self.reviewView = ReviewView()
+        # The Review tab is a bare clip browser; Calibrate wraps another one
+        # with its measurement panel.
+        self.reviewBrowser = ClipBrowser()
+        self.calibrationView = CalibrationView()
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self.captureView, "Capture")
-        self.tabs.addTab(self.reviewView, "Review")
+        self.tabs.addTab(self.reviewBrowser, "Review")
+        self.tabs.addTab(self.calibrationView, "Calibrate")
         self.setCentralWidget(self.tabs)
 
         self.captureView.statusMessage.connect(self.showStatus)
-        self.reviewView.statusMessage.connect(self.showStatus)
+        self.reviewBrowser.statusMessage.connect(self.showStatus)
+        self.calibrationView.statusMessage.connect(self.showStatus)
         self.captureView.clipRecorded.connect(self.onClipRecorded)
 
         self.buildMenuBar()
@@ -86,8 +92,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(message)
 
     def onOpenClip(self) -> None:
-        self.tabs.setCurrentWidget(self.reviewView)
-        self.reviewView.onOpenClicked()
+        self.tabs.setCurrentWidget(self.reviewBrowser)
+        self.reviewBrowser.onOpenClicked()
 
     def onChooseRecordingsDir(self) -> None:
         chosen = QFileDialog.getExistingDirectory(
@@ -104,7 +110,8 @@ class MainWindow(QMainWindow):
         """Point both tabs and the status bar at the chosen folder."""
         self.recordingsDir = path
         self.captureView.setRecordingsDir(path)
-        self.reviewView.setRecordingsDir(path)
+        self.reviewBrowser.setRecordingsDir(path)
+        self.calibrationView.setRecordingsDir(path)
         self.updateRecordingsLabel()
 
     def updateRecordingsLabel(self) -> None:
@@ -122,7 +129,7 @@ class MainWindow(QMainWindow):
 
     def onClipRecorded(self, path: Path) -> None:
         """Load a just-finished recording so the Review tab is ready on switch."""
-        self.reviewView.openClip(path)
+        self.reviewBrowser.openClip(path)
 
     def buildAboutText(self) -> str:
         year = datetime.date.today().year
@@ -144,5 +151,6 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self.captureView.shutdown()
-        self.reviewView.shutdown()
+        self.reviewBrowser.shutdown()
+        self.calibrationView.shutdown()
         super().closeEvent(event)
