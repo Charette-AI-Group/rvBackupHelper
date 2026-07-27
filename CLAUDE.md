@@ -20,6 +20,31 @@ on a PC, which is what confirms it is CVBS.
 the camera body for Voyager/ASA or Furrion branding. If it turns out to be AHD, the MAX7456
 route below is off the table and the project has to move to a capture-and-recompose design.
 
+### The capture hardware on the office desktop
+
+Two video devices are present, and they behave very differently:
+
+| Device | Device Manager group | Notes |
+|---|---|---|
+| `USB Video` | Cameras | **This is the grabber.** MacroSilicon chip, `VID_534D&PID_0021`. |
+| `HD Pro Webcam C920` | Imaging devices | Logitech webcam, not part of this project. |
+
+Hard-won facts about reaching them from OpenCV on Windows — all measured, not assumed:
+
+- **DirectShow cannot open the grabber at all** when it has no input signal. Media Foundation
+  can, and simply delivers no frames until video arrives. So MSMF is required as a fallback or
+  the grabber is invisible.
+- **DirectShow is far faster to open** — under a second for the webcam against about eleven
+  seconds for MSMF. So the probe tries DirectShow first and falls back to MSMF, preferring
+  whichever actually delivers frames. A full scan takes roughly five seconds.
+- **DirectShow *enumeration* sees every device including ones it cannot open**, which is where
+  the friendly names come from (via `pygrabber`). Enumeration order matches the OpenCV index.
+- **A grabber with no signal is a normal state, not an error.** It opens, reports 640x480, and
+  sends nothing. The app lists it as "no signal" and the capture loop waits rather than failing —
+  which also covers an RV camera wired to reverse gear that only powers up when you shift.
+- `OBS Virtual Camera` also enumerates but cannot be opened unless OBS is running, so it is
+  filtered out of the device list.
+
 ## Chosen approach: analog OSD overlay, inline
 
 Graphics are inserted into the analog signal in real time by dedicated OSD hardware, rather

@@ -37,6 +37,7 @@ class CaptureView(QWidget):
         self.captureWorker: CaptureWorker | None = None
         self.scanWorker: DeviceScanWorker | None = None
         self.devices: list[CameraDevice] = []
+        self.activeDevice: CameraDevice | None = None
         self.recordingPath: Path | None = None
         self.buildUi()
         self.updateControls()
@@ -81,9 +82,8 @@ class CaptureView(QWidget):
     def isRecording(self) -> bool:
         return self.recordingPath is not None
 
-    def selectedDeviceIndex(self) -> int | None:
-        data = self.deviceCombo.currentData()
-        return None if data is None else int(data)
+    def selectedDevice(self) -> CameraDevice | None:
+        return self.deviceCombo.currentData()
 
     def updateControls(self) -> None:
         hasDevice = self.deviceCombo.count() > 0
@@ -114,13 +114,16 @@ class CaptureView(QWidget):
         self.devices = devices
         self.deviceCombo.clear()
         for device in devices:
-            self.deviceCombo.addItem(device.displayName, device.index)
+            self.deviceCombo.addItem(device.displayName, device)
         if devices:
             self.statusMessage.emit(f"Found {len(devices)} capture device(s).")
             self.videoDisplay.clear("Ready - press Start Capture")
         else:
             self.statusMessage.emit("No capture devices found.")
             self.videoDisplay.clear("No capture devices found")
+        # The controls key off the device list, so refresh them here rather
+        # than relying on the scan's finished signal arriving afterwards.
+        self.updateControls()
 
     def onScanFailed(self, message: str) -> None:
         self.statusMessage.emit(f"Device scan failed: {message}")
@@ -140,28 +143,32 @@ class CaptureView(QWidget):
             self.startCapture()
 
     def startCapture(self) -> None:
-        deviceIndex = self.selectedDeviceIndex()
-        if deviceIndex is None:
+        device = self.selectedDevice()
+        if device is None:
             self.statusMessage.emit("Pick a capture device first.")
             return
 
         settings = CaptureSettings(
-            deviceIndex=deviceIndex,
+            deviceIndex=device.index,
             frameWidth=appConfig.defaultFrameWidth,
             frameHeight=appConfig.defaultFrameHeight,
             framesPerSecond=appConfig.defaultFramesPerSecond,
+            # Open on the backend the probe found working for this device.
+            backend=device.backend,
         )
         worker = CaptureWorker(settings, parent=self)
         worker.frameReady.connect(self.videoDisplay.showFrame)
         worker.captureStarted.connect(self.onCaptureStarted)
+        worker.signalStateChanged.connect(self.onSignalStateChanged)
         worker.recordingStarted.connect(self.onRecordingStarted)
         worker.recordingStopped.connect(self.onRecordingStopped)
         worker.errorOccurred.connect(self.onCaptureError)
         worker.finished.connect(self.onCaptureFinished)
 
+        self.activeDevice = device
         self.captureWorker = worker
         worker.start()
-        self.statusMessage.emit(f"Starting capture on device {deviceIndex}...")
+        self.statusMessage.emit(f"Starting capture on {device.label}...")
         self.updateControls()
 
     def stopCapture(self) -> None:
@@ -174,12 +181,24 @@ class CaptureView(QWidget):
         self.statusMessage.emit("Stopping capture...")
 
     def onCaptureStarted(self, settings: CaptureSettings) -> None:
+        device = self.activeDevice
+        name = device.label if device is not None else f"Device {settings.deviceIndex}"
+        backend = f" via {device.backendName}" if device is not None else ""
         self.detailLabel.setText(
-            f"Device {settings.deviceIndex} - "
+            f"{name}{backend} - "
             f"{settings.frameWidth}x{settings.frameHeight} @ "
             f"{settings.framesPerSecond:.0f} fps"
         )
         self.statusMessage.emit("Capturing.")
+
+    def onSignalStateChanged(self, hasSignal: bool) -> None:
+        if hasSignal:
+            self.statusMessage.emit("Video signal acquired.")
+            return
+        self.videoDisplay.clear("Waiting for video signal...")
+        self.statusMessage.emit(
+            "Waiting for a video signal - is the camera connected and powered?"
+        )
 
     def onCaptureError(self, message: str) -> None:
         logger.warning("Capture error: %s", message)
@@ -189,6 +208,7 @@ class CaptureView(QWidget):
         if self.captureWorker is not None:
             self.captureWorker.deleteLater()
             self.captureWorker = None
+        self.activeDevice = None
         self.recordingPath = None
         self.detailLabel.setText("Idle")
         self.videoDisplay.clear("Capture stopped")

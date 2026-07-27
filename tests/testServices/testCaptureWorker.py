@@ -1,7 +1,8 @@
 """Tests for the capture worker thread.
 
-Exercises the real QThread with fake services: the threading and the
-start/stop/record handshakes are the parts most likely to break.
+Exercises the real QThread with fake services: the threading, the
+start/stop/record handshakes and the wait-for-signal behaviour are the parts
+most likely to break.
 """
 
 from __future__ import annotations
@@ -20,13 +21,19 @@ signalTimeout = 5000
 grantedSettings = CaptureSettings(
     deviceIndex=0, frameWidth=320, frameHeight=240, framesPerSecond=30.0
 )
+neverSignals = 10**9
 
 
 class FakeCameraService:
-    """Delivers frames forever, slowly enough not to flood the signal queue."""
+    """Delivers frames slowly enough not to flood the signal queue.
 
-    def __init__(self, framePeriod: float = 0.005) -> None:
+    `framesBeforeSignal` empty reads come first, standing in for a grabber
+    whose camera has not started sending video yet.
+    """
+
+    def __init__(self, framePeriod: float = 0.005, framesBeforeSignal: int = 0) -> None:
         self.framePeriod = framePeriod
+        self.framesBeforeSignal = framesBeforeSignal
         self.opened = False
         self.closed = False
         self.readCount = 0
@@ -35,9 +42,11 @@ class FakeCameraService:
         self.opened = True
         return grantedSettings
 
-    def readFrame(self) -> np.ndarray:
+    def readFrame(self) -> np.ndarray | None:
         time.sleep(self.framePeriod)
         self.readCount += 1
+        if self.readCount <= self.framesBeforeSignal:
+            return None
         return np.full((240, 320, 3), 128, dtype=np.uint8)
 
     def close(self) -> None:
@@ -64,12 +73,17 @@ class FakeWriter:
         self.released = True
 
 
-def makeWorker(camera: FakeCameraService, writer: FakeWriter | None = None) -> CaptureWorker:
+def makeWorker(
+    camera: FakeCameraService,
+    writer: FakeWriter | None = None,
+    signalTimeoutSeconds: float | None = None,
+) -> CaptureWorker:
     recording = RecordingService(writerFactory=lambda *args: writer or FakeWriter())
     return CaptureWorker(
         CaptureSettings(deviceIndex=0),
         cameraService=camera,
         recordingService=recording,
+        signalTimeoutSeconds=signalTimeoutSeconds,
     )
 
 
@@ -101,6 +115,33 @@ def testWorkerReportsAFailureToOpenAndDoesNotStart(qtbot) -> None:
 
     assert "not available" in error.args[0]
     worker.wait(signalTimeout)
+
+
+def testWorkerWaitsForALateSignalRatherThanFailing(qtbot) -> None:
+    """A grabber sends nothing until its camera powers up. That is not an error."""
+    camera = FakeCameraService(framesBeforeSignal=3)
+    worker = makeWorker(camera)
+    states: list[bool] = []
+    worker.signalStateChanged.connect(states.append)
+
+    with qtbot.waitSignal(worker.frameReady, timeout=signalTimeout):
+        worker.start()
+    with qtbot.waitSignal(worker.finished, timeout=signalTimeout):
+        worker.requestStop()
+
+    assert states[:2] == [False, True]
+
+
+def testWorkerGivesUpOnceTheSignalTimeoutPasses(qtbot) -> None:
+    camera = FakeCameraService(framesBeforeSignal=neverSignals)
+    worker = makeWorker(camera, signalTimeoutSeconds=0.3)
+
+    with qtbot.waitSignal(worker.errorOccurred, timeout=signalTimeout) as error:
+        worker.start()
+
+    assert "No video signal" in error.args[0]
+    worker.wait(signalTimeout)
+    assert camera.closed
 
 
 def testRecordingStartsAndStopsWhileCapturing(qtbot, tmp_path: Path) -> None:

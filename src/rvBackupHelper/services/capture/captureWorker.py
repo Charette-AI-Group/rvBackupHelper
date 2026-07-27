@@ -9,10 +9,12 @@ this thread.
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QMutex, QMutexLocker, QThread, Signal
 
+from rvBackupHelper import appConfig
 from rvBackupHelper.models.captureModels import CaptureSettings
 from rvBackupHelper.services.capture.cameraService import CameraError, CameraService
 from rvBackupHelper.services.capture.recordingService import (
@@ -30,6 +32,8 @@ class CaptureWorker(QThread):
     frameReady = Signal(object)
     # Payload is the CaptureSettings the device actually granted.
     captureStarted = Signal(object)
+    # True when frames are arriving, False while waiting for a video signal.
+    signalStateChanged = Signal(bool)
     # Payload is the clip Path.
     recordingStarted = Signal(object)
     # Payload is the clip Path and the number of frames written.
@@ -41,16 +45,24 @@ class CaptureWorker(QThread):
         settings: CaptureSettings,
         cameraService: CameraService | None = None,
         recordingService: RecordingService | None = None,
+        signalTimeoutSeconds: float | None = None,
         parent: object | None = None,
     ) -> None:
         super().__init__(parent)
         self.settings = settings
         self.cameraService = cameraService or CameraService()
         self.recordingService = recordingService or RecordingService()
+        self.signalTimeoutSeconds = (
+            appConfig.signalTimeoutSeconds
+            if signalTimeoutSeconds is None
+            else signalTimeoutSeconds
+        )
         self.mutex = QMutex()
         self.stopRequested = False
         self.recordPathRequest: Path | None = None
         self.stopRecordingRequested = False
+        self.hasSignal = True
+        self.lastFrameAt = 0.0
 
     # ------------------------------------------------ called from the GUI --
 
@@ -86,6 +98,8 @@ class CaptureWorker(QThread):
             self.cameraService.close()
 
     def captureLoop(self, effectiveSettings: CaptureSettings) -> None:
+        self.lastFrameAt = time.monotonic()
+        self.hasSignal = True
         while not self.isStopRequested():
             try:
                 frame = self.cameraService.readFrame()
@@ -93,10 +107,44 @@ class CaptureWorker(QThread):
                 logger.warning("Capture loop ended: %s", exc)
                 self.errorOccurred.emit(str(exc))
                 return
+            if frame is None:
+                if not self.waitForSignal():
+                    return
+                continue
+            self.noteSignalAcquired()
             self.serviceRecordingRequests(effectiveSettings)
             if self.recordingService.isRecording:
                 self.recordingService.writeFrame(frame)
             self.frameReady.emit(frame)
+
+    def waitForSignal(self) -> bool:
+        """Handle a read that produced no frame. False means give up.
+
+        An empty read is ordinary: a grabber with nothing plugged in returns
+        one every time, and an RV camera wired to reverse gear only starts
+        sending when the driver shifts. So this waits rather than failing.
+        """
+        if self.hasSignal:
+            self.hasSignal = False
+            logger.info("Waiting for a video signal")
+            self.signalStateChanged.emit(False)
+        if time.monotonic() - self.lastFrameAt > self.signalTimeoutSeconds:
+            message = (
+                f"No video signal for {self.signalTimeoutSeconds:.0f} s - "
+                "is the camera connected and powered?"
+            )
+            logger.warning(message)
+            self.errorOccurred.emit(message)
+            return False
+        self.msleep(int(appConfig.signalRetrySeconds * 1000))
+        return True
+
+    def noteSignalAcquired(self) -> None:
+        self.lastFrameAt = time.monotonic()
+        if not self.hasSignal:
+            self.hasSignal = True
+            logger.info("Video signal acquired")
+            self.signalStateChanged.emit(True)
 
     def isStopRequested(self) -> bool:
         with QMutexLocker(self.mutex):

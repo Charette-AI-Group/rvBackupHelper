@@ -9,6 +9,12 @@ import pytest
 from rvBackupHelper.models.captureModels import CaptureSettings
 from rvBackupHelper.services.capture.cameraService import CameraError, CameraService
 
+# Stand-in backend ids, ordered the way the real ones are: the fast backend
+# first, the one that copes with signal-less devices as the fallback.
+primaryBackend = 101
+secondaryBackend = 202
+fakeBackends = [("Primary", primaryBackend), ("Secondary", secondaryBackend)]
+
 
 def makeFrame(width: int = 640, height: int = 480, value: int = 128) -> np.ndarray:
     return np.full((height, width, 3), value, dtype=np.uint8)
@@ -59,46 +65,127 @@ class FakeCapture:
         self.released = True
 
 
-def factoryFor(captures: dict[int, FakeCapture]):
-    """Capture factory serving a prepared FakeCapture per device index."""
+def sizedCapture(width: int, height: int, frames: list[np.ndarray] | None = None) -> FakeCapture:
+    """A capture reporting a size, optionally with frames to hand out."""
+    return FakeCapture(
+        frames=frames,
+        fixedProperties={
+            cv2.CAP_PROP_FRAME_WIDTH: width,
+            cv2.CAP_PROP_FRAME_HEIGHT: height,
+        },
+    )
+
+
+def factoryFor(captures: dict[tuple[int, int], FakeCapture]):
+    """Capture factory serving a prepared FakeCapture per (index, backend)."""
 
     def factory(deviceIndex: int, backend: int) -> FakeCapture:
-        return captures.get(deviceIndex, FakeCapture(opened=False))
+        return captures.get((deviceIndex, backend)) or FakeCapture(opened=False)
 
     return factory
 
 
-def testListDevicesKeepsOnlyDevicesThatDeliverAFrame() -> None:
+def serviceWith(captures, names: list[str] | None = None) -> CameraService:
+    return CameraService(
+        captureFactory=factoryFor(captures),
+        backends=fakeBackends,
+        nameProvider=lambda: list(names or []),
+    )
+
+
+# ------------------------------------------------------------ discovery ---
+
+
+def testListDevicesUsesFriendlyNamesAndBoundsTheProbe() -> None:
     captures = {
-        0: FakeCapture(frames=[makeFrame(640, 480)]),
-        1: FakeCapture(opened=False),
-        2: FakeCapture(frames=[]),  # opens, but never yields a frame
-        3: FakeCapture(frames=[makeFrame(720, 576)]),
+        (0, primaryBackend): FakeCapture(frames=[makeFrame(640, 480)]),
+        (1, primaryBackend): FakeCapture(frames=[makeFrame(720, 576)]),
     }
-    service = CameraService(captureFactory=factoryFor(captures), backend=0)
+    service = serviceWith(captures, names=["HD Pro Webcam C920", "USB Video"])
 
-    devices = service.listDevices(maxIndex=4)
+    devices = service.listDevices()
 
-    assert [device.index for device in devices] == [0, 3]
-    assert devices[0].frameWidth == 640
-    assert devices[0].frameHeight == 480
-    assert devices[1].frameWidth == 720
-    assert "720x576" in devices[1].displayName
+    assert [device.label for device in devices] == ["HD Pro Webcam C920", "USB Video"]
+    assert devices[0].displayName == "HD Pro Webcam C920 (640x480)"
+
+
+def testListDevicesFallsBackToGenericLabelsWithoutNames() -> None:
+    captures = {(0, primaryBackend): FakeCapture(frames=[makeFrame()])}
+    service = serviceWith(captures)
+
+    devices = service.listDevices(maxIndex=2)
+
+    assert [device.label for device in devices] == ["Camera 0"]
+
+
+def testDeviceWithNoSignalIsStillListed() -> None:
+    """A grabber with nothing plugged in opens but sends nothing. It is real."""
+    captures = {
+        # Opens on both backends, never yields a frame.
+        (0, primaryBackend): sizedCapture(720, 576),
+        (0, secondaryBackend): sizedCapture(720, 576),
+    }
+    service = serviceWith(captures, names=["USB Video"])
+
+    devices = service.listDevices()
+
+    assert len(devices) == 1
+    device = devices[0]
+    assert device.label == "USB Video"
+    assert not device.hasSignal
+    assert (device.frameWidth, device.frameHeight) == (720, 576)
+    assert device.displayName == "USB Video (720x576, no signal)"
+
+
+def testDeviceNoBackendCanOpenIsSkipped() -> None:
+    """A virtual camera whose app is not running cannot be captured from."""
+    service = serviceWith({}, names=["OBS Virtual Camera"])
+
+    assert service.listDevices() == []
+
+
+def testProbePrefersTheBackendThatDeliversFrames() -> None:
+    captures = {
+        (0, primaryBackend): sizedCapture(640, 480),  # opens, no frames
+        (0, secondaryBackend): FakeCapture(frames=[makeFrame(640, 480)]),
+    }
+    service = serviceWith(captures, names=["Some Camera"])
+
+    device = service.listDevices()[0]
+
+    assert device.hasSignal
+    assert device.backend == secondaryBackend
+    assert device.backendName == "Secondary"
+
+
+def testProbeFallsBackToABackendThatOpensWithoutSignal() -> None:
+    captures = {(0, primaryBackend): sizedCapture(640, 480)}
+    service = serviceWith(captures, names=["USB Video"])
+
+    device = service.listDevices()[0]
+
+    assert not device.hasSignal
+    assert device.backend == primaryBackend
 
 
 def testListDevicesReleasesEveryProbedDevice() -> None:
-    captures = {0: FakeCapture(frames=[makeFrame()]), 1: FakeCapture(opened=False)}
-    service = CameraService(captureFactory=factoryFor(captures), backend=0)
+    captures = {
+        (0, primaryBackend): FakeCapture(frames=[makeFrame()]),
+        (1, primaryBackend): sizedCapture(640, 480),
+        (1, secondaryBackend): sizedCapture(640, 480),
+    }
+    service = serviceWith(captures, names=["A", "B"])
 
-    service.listDevices(maxIndex=2)
+    service.listDevices()
 
-    assert captures[0].released
-    assert captures[1].released
+    assert all(capture.released for capture in captures.values())
+
+
+# -------------------------------------------------------------- capture ---
 
 
 def testOpenRaisesWhenDeviceWillNotOpen() -> None:
-    captures = {0: FakeCapture(opened=False)}
-    service = CameraService(captureFactory=factoryFor(captures), backend=0)
+    service = serviceWith({})
 
     with pytest.raises(CameraError, match="Could not open capture device 0"):
         service.open(CaptureSettings(deviceIndex=0))
@@ -106,10 +193,28 @@ def testOpenRaisesWhenDeviceWillNotOpen() -> None:
     assert not service.isOpen
 
 
+def testOpenUsesTheBackendNamedInTheSettings() -> None:
+    captures = {(0, secondaryBackend): FakeCapture(frames=[makeFrame()])}
+    service = serviceWith(captures)
+
+    effective = service.open(CaptureSettings(deviceIndex=0, backend=secondaryBackend))
+
+    assert service.isOpen
+    assert effective.backend == secondaryBackend
+
+
+def testOpenWithoutABackendUsesTheFirstPriorityBackend() -> None:
+    captures = {(0, primaryBackend): FakeCapture(frames=[makeFrame()])}
+    service = serviceWith(captures)
+
+    effective = service.open(CaptureSettings(deviceIndex=0))
+
+    assert effective.backend == primaryBackend
+
+
 def testOpenReportsTheFormatTheDeviceActuallyGranted() -> None:
-    # Device insists on 720x576 @ 25 fps whatever we ask for.
     captures = {
-        0: FakeCapture(
+        (0, primaryBackend): FakeCapture(
             frames=[makeFrame()],
             fixedProperties={
                 cv2.CAP_PROP_FRAME_WIDTH: 720,
@@ -118,28 +223,28 @@ def testOpenReportsTheFormatTheDeviceActuallyGranted() -> None:
             },
         )
     }
-    service = CameraService(captureFactory=factoryFor(captures), backend=0)
+    service = serviceWith(captures)
 
     effective = service.open(
         CaptureSettings(deviceIndex=0, frameWidth=640, frameHeight=480, framesPerSecond=30.0)
     )
 
-    assert effective.frameWidth == 720
-    assert effective.frameHeight == 576
+    assert (effective.frameWidth, effective.frameHeight) == (720, 576)
     assert effective.framesPerSecond == 25.0
-    assert service.isOpen
 
 
 def testOpenFallsBackToRequestedSettingsWhenDeviceReportsNothing() -> None:
-    captures = {0: FakeCapture(frames=[makeFrame()])}
-    service = CameraService(captureFactory=factoryFor(captures), backend=0)
-    # A device reporting 0 for everything must not yield a 0x0 capture.
-    captures[0].properties.clear()
-    captures[0].fixedProperties = {
-        cv2.CAP_PROP_FRAME_WIDTH: 0,
-        cv2.CAP_PROP_FRAME_HEIGHT: 0,
-        cv2.CAP_PROP_FPS: 0,
+    captures = {
+        (0, primaryBackend): FakeCapture(
+            frames=[makeFrame()],
+            fixedProperties={
+                cv2.CAP_PROP_FRAME_WIDTH: 0,
+                cv2.CAP_PROP_FRAME_HEIGHT: 0,
+                cv2.CAP_PROP_FPS: 0,
+            },
+        )
     }
+    service = serviceWith(captures)
 
     effective = service.open(
         CaptureSettings(deviceIndex=0, frameWidth=640, frameHeight=480, framesPerSecond=30.0)
@@ -150,38 +255,39 @@ def testOpenFallsBackToRequestedSettingsWhenDeviceReportsNothing() -> None:
 
 
 def testReadFrameWithoutOpenRaises() -> None:
-    service = CameraService(captureFactory=factoryFor({}), backend=0)
+    service = serviceWith({})
 
     with pytest.raises(CameraError, match="No capture device is open"):
         service.readFrame()
 
 
-def testReadFrameRaisesWhenTheDeviceStops() -> None:
-    captures = {0: FakeCapture(frames=[makeFrame(value=10)])}
-    service = CameraService(captureFactory=factoryFor(captures), backend=0)
+def testReadFrameReturnsNoneWhenTheDeviceSendsNothing() -> None:
+    """No frame is not an error — the signal may simply not have arrived yet."""
+    captures = {(0, primaryBackend): FakeCapture(frames=[makeFrame(value=10)])}
+    service = serviceWith(captures)
     service.open(CaptureSettings(deviceIndex=0))
 
     first = service.readFrame()
+    assert first is not None
     assert int(first.mean()) == 10
 
-    with pytest.raises(CameraError, match="stopped delivering frames"):
-        service.readFrame()
+    assert service.readFrame() is None
 
 
 def testCloseReleasesTheDeviceAndClearsState() -> None:
-    captures = {0: FakeCapture(frames=[makeFrame()])}
-    service = CameraService(captureFactory=factoryFor(captures), backend=0)
+    capture = FakeCapture(frames=[makeFrame()])
+    service = serviceWith({(0, primaryBackend): capture})
     service.open(CaptureSettings(deviceIndex=0))
 
     service.close()
 
-    assert captures[0].released
+    assert capture.released
     assert not service.isOpen
     assert service.settings is None
 
 
 def testCloseIsSafeToCallTwice() -> None:
-    service = CameraService(captureFactory=factoryFor({}), backend=0)
+    service = serviceWith({})
     service.close()
     service.close()
     assert not service.isOpen

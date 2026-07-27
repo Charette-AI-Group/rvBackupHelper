@@ -28,9 +28,18 @@ defaultFrameWidth = 640
 defaultFrameHeight = 480
 defaultFramesPerSecond = 30.0
 
-# OpenCV exposes no device enumeration API, so listDevices() probes indices
-# 0..maxDeviceProbeIndex - 1 and keeps the ones that open and deliver a frame.
+# OpenCV exposes no device enumeration API. When friendly names are available
+# they bound the probe; otherwise listDevices() falls back to probing indices
+# 0..maxDeviceProbeIndex - 1.
 maxDeviceProbeIndex = 8
+
+# How long the capture loop waits for frames before declaring the signal dead.
+# A capture dongle with nothing plugged in opens fine and simply sends nothing,
+# and an RV camera powered only in reverse gear arrives late by design — so
+# waiting is the normal case, not an error.
+signalTimeoutSeconds = 30.0
+# How long to pause between retries while waiting for a signal.
+signalRetrySeconds = 0.1
 
 # MJPG in an AVI container compresses each frame independently, so every frame
 # decodes on its own and seeking during review is frame-exact. Calibration

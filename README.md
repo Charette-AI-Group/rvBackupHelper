@@ -29,10 +29,16 @@ Or just double-click **`runApp.cmd`** in the project folder (needs the one-time 
 
 ## Using the app
 
-**Capture tab** — press **Scan Devices** to probe for capture hardware (OpenCV has no
-enumeration API, so this opens and closes each device index in turn and takes a few
-seconds). Pick the grabber from the list, press **Start Capture** for a live preview,
-and **Start Recording** to write a clip.
+**Capture tab** — press **Scan Devices** to find capture hardware. Devices are listed by
+their Windows name, so the grabber (`USB Video`) is easy to tell from a webcam. A device
+that opens but is not receiving video is listed as **no signal** rather than hidden — that
+is the normal state for a grabber with nothing plugged in. The scan opens and closes each
+device in turn and takes a few seconds; it runs off the GUI thread.
+
+Pick the device, press **Start Capture** for a live preview, and **Start Recording** to
+write a clip. Starting capture on a device with no signal is fine: the preview shows
+"Waiting for video signal" and starts as soon as video arrives, which is what an RV camera
+powered only in reverse gear needs.
 
 Clips land in `recordings/` as timestamped `.avi` files, MJPG encoded. MJPG compresses
 each frame on its own, so every frame decodes independently and seeking is frame-exact —

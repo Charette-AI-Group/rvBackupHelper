@@ -8,16 +8,27 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class CameraDevice:
-    """A capture device that answered a probe with a real frame."""
+    """A capture device that a backend was able to open.
+
+    `hasSignal` is False for a device that opens but sends no frames — a
+    capture dongle with nothing plugged into it. Those stay in the list on
+    purpose: the device is real and selectable, it is the video that is
+    missing.
+    """
 
     index: int
     label: str
     frameWidth: int
     frameHeight: int
+    backend: int
+    backendName: str
+    hasSignal: bool = True
 
     @property
     def displayName(self) -> str:
-        return f"{self.label} ({self.frameWidth}x{self.frameHeight})"
+        size = f"{self.frameWidth}x{self.frameHeight}"
+        signal = "" if self.hasSignal else ", no signal"
+        return f"{self.label} ({size}{signal})"
 
 
 @dataclass(frozen=True)
@@ -28,6 +39,8 @@ class CaptureSettings:
     frameWidth: int = 640
     frameHeight: int = 480
     framesPerSecond: float = 30.0
+    # Which OpenCV backend to open with. None means the service default.
+    backend: int | None = None
 
 
 @dataclass(frozen=True)

@@ -7,6 +7,10 @@ dependencies = [
     "PySide6>=6.6,<7",
     "numpy>=2.0,<3",
     "opencv-python>=4.10,<5",
+    # Friendly capture-device names. DirectShow enumerates every video device,
+    # including ones it cannot open itself, so a grabber with no signal still
+    # gets its real name.
+    "pygrabber>=0.2; sys_platform == 'win32'",
 ]
 
 [project.optional-dependencies]
