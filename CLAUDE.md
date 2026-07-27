@@ -195,6 +195,16 @@ firmware on the bench source came out at 1.32, 2.72, 3.24, 3.37 and 5.51 px. So:
 - The whole overlay also sits a few pixels lower or higher from run to run, which points at
   the incoming sync rather than at anything running on the Arduino.
 
+**Field observation (2026-07-27):** adjusting R4 improves it briefly and then it drifts back,
+repeatedly; left alone it cycles slowly between very good and mediocre. That fits a source
+whose sync *amplitude* is wandering — R4 sets the LM1881 slicing threshold, so a moving sync
+level means a moving ideal threshold and you chase it forever. The slow cycling also fits a
+beat between the wobbling field rate and TVout's internal timing.
+
+**Testable prediction:** against a crystal-locked camera, one R4 setting should hold instead
+of needing to be chased. If it still wanders with the RV camera, the cause is on the shield
+and this analysis is wrong.
+
 **Most likely dominant cause: the bench source.** The test footage is VHS-grade, and VHS
 timebase error is exactly this symptom. Two things would settle it, both physical:
 
