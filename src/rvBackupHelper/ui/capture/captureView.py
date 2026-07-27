@@ -24,6 +24,10 @@ from rvBackupHelper.ui.widgets.videoDisplay import VideoDisplay
 
 logger = logging.getLogger(__name__)
 
+# Shown once on the empty preview so a first-time user knows where to start.
+# Cleared for good the moment Scan Devices is pressed.
+startupHint = "Press Scan Devices to start"
+
 
 class CaptureView(QWidget):
     """Live preview plus recording controls."""
@@ -64,7 +68,8 @@ class CaptureView(QWidget):
         controls.addWidget(self.recordButton)
 
         self.videoDisplay = VideoDisplay()
-        self.videoDisplay.clear("Scan for a device, then start capture")
+        self.videoDisplay.clear("No video")
+        self.videoDisplay.setHint(startupHint)
         self.detailLabel = QLabel("Idle")
 
         layout = QVBoxLayout(self)
@@ -102,6 +107,8 @@ class CaptureView(QWidget):
     def onScanClicked(self) -> None:
         if self.scanWorker is not None:
             return
+        # The hint has served its purpose the moment the user acts on it.
+        self.videoDisplay.clearHint()
         self.statusMessage.emit("Scanning for capture devices...")
         self.scanWorker = DeviceScanWorker(parent=self)
         self.scanWorker.devicesFound.connect(self.onDevicesFound)

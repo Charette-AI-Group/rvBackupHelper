@@ -2,8 +2,25 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import QObject, Signal
+
 from rvBackupHelper.models.captureModels import CameraDevice
-from rvBackupHelper.ui.capture.captureView import CaptureView
+from rvBackupHelper.ui.capture.captureView import CaptureView, startupHint
+
+
+class FakeScanWorker(QObject):
+    """Stands in for DeviceScanWorker so tests never touch real hardware."""
+
+    devicesFound = Signal(object)
+    errorOccurred = Signal(str)
+    finished = Signal()
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self.startCalled = False
+
+    def start(self) -> None:
+        self.startCalled = True
 
 liveDevice = CameraDevice(
     index=0,
@@ -83,6 +100,30 @@ def testEmptyScanResultLeavesCaptureDisabled(qtbot) -> None:
     assert view.deviceCombo.count() == 0
     assert not view.captureButton.isEnabled()
     assert view.selectedDevice() is None
+
+
+def testStartsWithAHintTellingTheUserWhereToBegin(qtbot) -> None:
+    view = CaptureView()
+    qtbot.addWidget(view)
+
+    assert view.videoDisplay.hintText == startupHint
+
+
+def testPressingScanClearsTheHintForGood(qtbot, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "rvBackupHelper.ui.capture.captureView.DeviceScanWorker", FakeScanWorker
+    )
+    view = CaptureView()
+    qtbot.addWidget(view)
+
+    view.onScanClicked()
+
+    assert view.scanWorker.startCalled
+    assert view.videoDisplay.hintText == ""
+
+    # Later placeholder changes must not bring it back.
+    view.onDevicesFound([liveDevice])
+    assert view.videoDisplay.hintText == ""
 
 
 def testSignalLossUpdatesThePreviewPlaceholder(qtbot) -> None:

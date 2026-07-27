@@ -7,6 +7,12 @@ from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QColor, QImage, QPainter, QPaintEvent
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
+backgroundColor = "#101010"
+placeholderColor = "#909090"
+# Distinct enough from the placeholder to read as guidance rather than status.
+hintColor = "#6ea8d8"
+hintGapPixels = 6
+
 
 def toQImage(frame: np.ndarray) -> QImage:
     """Wrap a BGR frame as a QImage.
@@ -34,12 +40,21 @@ class VideoDisplay(QWidget):
         super().__init__(parent)
         self.image = QImage()
         self.placeholderText = "No video"
+        self.hintText = ""
         self.setMinimumSize(320, 240)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     @property
     def hasFrame(self) -> bool:
         return not self.image.isNull()
+
+    def setHint(self, text: str) -> None:
+        """Show a one-off instruction under the placeholder message."""
+        self.hintText = text
+        self.update()
+
+    def clearHint(self) -> None:
+        self.setHint("")
 
     def showFrame(self, frame: np.ndarray) -> None:
         self.image = toQImage(frame)
@@ -53,15 +68,30 @@ class VideoDisplay(QWidget):
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor("#101010"))
+        painter.fillRect(self.rect(), QColor(backgroundColor))
         if self.image.isNull():
-            painter.setPen(QColor("#909090"))
-            painter.drawText(
-                self.rect(), Qt.AlignmentFlag.AlignCenter, self.placeholderText
-            )
+            self.paintPlaceholder(painter)
             return
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         painter.drawImage(self.frameRect(), self.image)
+
+    def paintPlaceholder(self, painter: QPainter) -> None:
+        centred = Qt.AlignmentFlag.AlignCenter
+        painter.setPen(QColor(placeholderColor))
+        if not self.hintText:
+            painter.drawText(self.rect(), centred, self.placeholderText)
+            return
+
+        # Two lines: shift each half a line off centre so the pair reads as a
+        # centred block rather than the message sitting off-centre.
+        shift = (painter.fontMetrics().height() + hintGapPixels) // 2
+        painter.drawText(self.rect().translated(0, -shift), centred, self.placeholderText)
+
+        hintFont = painter.font()
+        hintFont.setItalic(True)
+        painter.setFont(hintFont)
+        painter.setPen(QColor(hintColor))
+        painter.drawText(self.rect().translated(0, shift), centred, self.hintText)
 
     def frameRect(self) -> QRect:
         """Largest centred rectangle keeping the frame's aspect ratio."""

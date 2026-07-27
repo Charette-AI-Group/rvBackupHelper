@@ -53,6 +53,51 @@ def testShowFrameThenClear(qtbot) -> None:
     assert display.placeholderText == "Nothing here"
 
 
+def testHintIsEmptyUntilSet(qtbot) -> None:
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+
+    assert display.hintText == ""
+
+
+def testSetHintThenClearHint(qtbot) -> None:
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+
+    display.setHint("Press Scan Devices to start")
+    assert display.hintText == "Press Scan Devices to start"
+
+    display.clearHint()
+    assert display.hintText == ""
+
+
+def testHintChangesWhatIsPainted(qtbot) -> None:
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+    display.resize(400, 300)
+    display.clear("No video")
+
+    withoutHint = display.grab().toImage()
+    display.setHint("Press Scan Devices to start")
+    withHint = display.grab().toImage()
+
+    assert withHint != withoutHint
+
+
+def testHintIsNotPaintedOverAFrame(qtbot) -> None:
+    """Once video is showing, the placeholder and its hint are gone."""
+    display = VideoDisplay()
+    qtbot.addWidget(display)
+    display.resize(400, 300)
+    display.setHint("Press Scan Devices to start")
+
+    display.showFrame(makeFrame(400, 300, value=90))
+    withHint = display.grab().toImage()
+    display.clearHint()
+
+    assert display.grab().toImage() == withHint
+
+
 def testFrameRectKeepsAspectRatioAndCentres(qtbot) -> None:
     display = VideoDisplay()
     qtbot.addWidget(display)
