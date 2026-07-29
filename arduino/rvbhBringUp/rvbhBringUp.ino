@@ -39,7 +39,13 @@
  * https://github.com/nootropicdesign/arduino-tvout-ve
  */
 
-#define USE_OVERLAY 0
+/*
+ * Defaults to STAGE B. The rig is jumpered for overlay (SYNC SELECT on the two
+ * rightmost pins, OUTPUT SELECT on Overlay), so this default matches the wiring
+ * and a fresh checkout cannot flash the tearing combination by accident. Set it
+ * back to 0 only together with the Stage A jumper positions above.
+ */
+#define USE_OVERLAY 1
 
 /*
  * ANIMATE 1 sweeps a block along the bottom to prove the loop is running, at
