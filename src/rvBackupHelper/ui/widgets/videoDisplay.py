@@ -18,6 +18,10 @@ hintGapPixels = 6
 markerColor = "#ffd166"
 markerLabelPadding = 6
 markerLabelLift = 4
+# Width edges get their own colour so they read as a different measurement
+# from the distance lines they sit on.
+edgeMarkerColor = "#8ce99a"
+edgeTickHalfHeight = 7
 
 
 def toQImage(frame: np.ndarray) -> QImage:
@@ -51,6 +55,7 @@ class VideoDisplay(QWidget):
         self.placeholderText = "No video"
         self.hintText = ""
         self.markers: list[tuple[int, str]] = []
+        self.edgeMarkers: list[tuple[int, int]] = []
         self.setMinimumSize(320, 240)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
@@ -61,6 +66,11 @@ class VideoDisplay(QWidget):
     def setMarkers(self, markers: Sequence[tuple[int, str]]) -> None:
         """Horizontal guides to draw, as (scan line in frame pixels, label)."""
         self.markers = list(markers)
+        self.update()
+
+    def setEdgeMarkers(self, marks: Sequence[tuple[int, int]]) -> None:
+        """Short vertical ticks at (x, y) in frame pixels, for width edges."""
+        self.edgeMarkers = list(marks)
         self.update()
 
     def setHint(self, text: str) -> None:
@@ -92,7 +102,7 @@ class VideoDisplay(QWidget):
         self.paintMarkers(painter)
 
     def paintMarkers(self, painter: QPainter) -> None:
-        if not self.markers or self.image.height() <= 0:
+        if self.image.height() <= 0 or self.image.width() <= 0:
             return
         rect = self.frameRect()
         painter.setPen(QColor(markerColor))
@@ -103,6 +113,12 @@ class VideoDisplay(QWidget):
                 painter.drawText(
                     rect.left() + markerLabelPadding, y - markerLabelLift, label
                 )
+
+        painter.setPen(QColor(edgeMarkerColor))
+        for edgeX, scanLine in self.edgeMarkers:
+            x = rect.left() + round(edgeX * rect.width() / self.image.width())
+            y = rect.top() + round(scanLine * rect.height() / self.image.height())
+            painter.drawLine(x, y - edgeTickHalfHeight, x, y + edgeTickHalfHeight)
 
     def paintPlaceholder(self, painter: QPainter) -> None:
         centred = Qt.AlignmentFlag.AlignCenter

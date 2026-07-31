@@ -77,6 +77,80 @@ def testSaveCreatesMissingDirectories(tmp_path: Path, calibration: Calibration) 
     assert path.exists()
 
 
+def testWidthEdgesAndFramesRoundTrip(tmp_path: Path) -> None:
+    calibration = Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[
+            CalibrationPoint(4.0, 316, leftEdge=120, rightEdge=520, frameIndex=2265),
+            CalibrationPoint(8.0, 193, frameIndex=3089),
+        ],
+    )
+    path = tmp_path / "calibration.json"
+    service = CalibrationService()
+
+    service.save(calibration, path)
+    loaded = service.load(path)
+
+    near, far = loaded.sortedPoints
+    assert (near.leftEdge, near.rightEdge) == (120, 520)
+    assert near.frameIndex == 2265
+    assert far.leftEdge is None and far.rightEdge is None
+    assert far.frameIndex == 3089
+    assert loaded.widthPoints == [near]
+
+
+def testSavedWidthCarriesItsOverlayColumns(tmp_path: Path) -> None:
+    calibration = Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[CalibrationPoint(4.0, 316, leftEdge=120, rightEdge=520)],
+    )
+    path = tmp_path / "calibration.json"
+    CalibrationService().save(calibration, path)
+
+    point = json.loads(path.read_text(encoding="utf-8"))["points"][0]
+
+    assert point["overlayLeft"] == 26  # 120 of 640 onto a 136-wide canvas
+    assert point["overlayRight"] == 110  # 520 -> 110.5, rounded half to even
+
+
+def testAPointWithoutWidthOmitsTheEdgeKeys(tmp_path: Path) -> None:
+    """Distance-only calibrations stay legible; absent is not zero."""
+    calibration = Calibration(
+        frameWidth=640, frameHeight=480, points=[CalibrationPoint(4.0, 316)]
+    )
+    path = tmp_path / "calibration.json"
+    CalibrationService().save(calibration, path)
+
+    point = json.loads(path.read_text(encoding="utf-8"))["points"][0]
+
+    assert "leftEdge" not in point
+    assert "rightEdge" not in point
+
+
+def testOlderFilesWithoutPerPointFramesStillLoad(tmp_path: Path) -> None:
+    """Frames used to live on the calibration; those files must still open."""
+    path = tmp_path / "legacy.json"
+    path.write_text(
+        json.dumps(
+            {
+                "version": calibrationFormatVersion,
+                "frameWidth": 640,
+                "frameHeight": 480,
+                "frameIndex": 3998,
+                "points": [{"distanceFeet": 3.0, "scanLine": 430}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = CalibrationService().load(path)
+
+    assert loaded.points[0].frameIndex == 3998
+    assert loaded.points[0].leftEdge is None
+
+
 def testLoadingAMissingFileRaises(tmp_path: Path) -> None:
     with pytest.raises(CalibrationError, match="not found"):
         CalibrationService().load(tmp_path / "nope.json")

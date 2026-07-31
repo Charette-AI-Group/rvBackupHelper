@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from rvBackupHelper.models.calibrationModels import Calibration, CalibrationPoint
+from rvBackupHelper.models.calibrationModels import (
+    Calibration,
+    CalibrationPoint,
+    Edge,
+)
 
 
 def makeCalibration(**overrides) -> Calibration:
@@ -72,6 +76,77 @@ def testMarkersAreOrderedAndLabelled() -> None:
     calibration.addPoint(CalibrationPoint(3.0, 420))
 
     assert calibration.markers() == [(420, "3 ft"), (360, "6 ft")]
+
+
+def testAPointHasNoWidthUntilBothEdgesAreMarked() -> None:
+    calibration = makeCalibration()
+    calibration.addPoint(CalibrationPoint(4.0, 316))
+
+    assert not calibration.points[0].hasWidth
+
+    assert calibration.setEdge(4.0, Edge.left, 120, frameIndex=2265)
+    assert not calibration.points[0].hasWidth  # one edge draws nothing
+
+    assert calibration.setEdge(4.0, Edge.right, 520, frameIndex=2265)
+    assert calibration.points[0].hasWidth
+    assert calibration.widthPoints == calibration.points
+
+
+def testEdgesRecordTheFrameTheyWereMarkedOn() -> None:
+    """The pole moves between distances, so frames are per point."""
+    calibration = makeCalibration()
+    calibration.addPoint(CalibrationPoint(4.0, 316, frameIndex=2265))
+
+    calibration.setEdge(4.0, Edge.left, 120, frameIndex=2270)
+
+    assert calibration.points[0].frameIndex == 2270
+    assert calibration.points[0].scanLine == 316
+
+
+def testMarkingAnEdgeWithoutItsDistanceIsRefused() -> None:
+    calibration = makeCalibration()
+
+    assert not calibration.setEdge(4.0, Edge.left, 120, frameIndex=1)
+    assert calibration.isEmpty
+
+
+def testReMarkingAnEdgeReplacesIt() -> None:
+    calibration = makeCalibration()
+    calibration.addPoint(CalibrationPoint(4.0, 316))
+    calibration.setEdge(4.0, Edge.left, 120, frameIndex=1)
+
+    calibration.setEdge(4.0, Edge.left, 130, frameIndex=1)
+
+    assert calibration.points[0].leftEdge == 130
+
+
+def testOverlayColumnRescalesOntoTheCanvasWidth() -> None:
+    calibration = makeCalibration(frameWidth=640)
+
+    assert calibration.overlayColumn(0, overlayWidth=136) == 0
+    assert calibration.overlayColumn(320, overlayWidth=136) == 68
+    assert calibration.overlayColumn(640, overlayWidth=136) == 135
+    assert calibration.overlayColumn(-5, overlayWidth=136) == 0
+
+
+def testEdgeMarkersReportEveryMarkedSide() -> None:
+    calibration = makeCalibration()
+    calibration.addPoint(CalibrationPoint(4.0, 316))
+    calibration.addPoint(CalibrationPoint(8.0, 193))
+    calibration.setEdge(4.0, Edge.left, 120, frameIndex=1)
+    calibration.setEdge(4.0, Edge.right, 520, frameIndex=1)
+    calibration.setEdge(8.0, Edge.left, 200, frameIndex=2)
+
+    assert calibration.edgeMarkers() == [(120, 316), (520, 316), (200, 193)]
+
+
+def testWidthDoesNotDisturbNearToFarOrdering() -> None:
+    calibration = makeCalibration()
+    calibration.addPoint(CalibrationPoint(8.0, 193))
+    calibration.addPoint(CalibrationPoint(4.0, 316))
+    calibration.setEdge(8.0, Edge.left, 200, frameIndex=1)
+
+    assert [p.distanceFeet for p in calibration.sortedPoints] == [4.0, 8.0]
 
 
 def testClearEmptiesThePoints() -> None:

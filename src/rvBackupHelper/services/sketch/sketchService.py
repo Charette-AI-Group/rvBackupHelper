@@ -89,6 +89,8 @@ $gridRows
 };
 const uint8_t GRID_COUNT = sizeof(GRID) / sizeof(GRID[0]);
 
+$widthSection
+
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   // begin() returns non-zero when the frame buffer will not fit. Without it
@@ -101,6 +103,7 @@ void setup() {
   tv.select_font(font4x6);
   tv.fill(0);
   drawGrid();
+  drawWidthLines();
 }
 
 // Visible distress signal on the on-board LED, which the shield leaves free.
@@ -156,6 +159,8 @@ void drawBrokenLine(const GridLine &line) {
   }
 }
 
+$widthDrawing
+
 void loop() {
   // The grid is static: draw once, then idle so the overlay stays put.
   tv.delay_frame(30);
@@ -207,6 +212,8 @@ class SketchService:
             generatedAt=stamp,
             labelGap=appConfig.labelGapPixels,
             gridRows=self.renderRows(calibration),
+            widthSection=self.renderWidthSection(calibration),
+            widthDrawing=self.renderWidthDrawing(calibration),
         )
 
     def labelPosition(
@@ -235,6 +242,77 @@ class SketchService:
         # Both slots taken: keep it on the right rather than over the left label.
         return right, labelY
 
+    def renderWidthSection(self, calibration: Calibration) -> str:
+        """The WIDTH array, or a stub when no width was measured."""
+        points = calibration.widthPoints
+        if not points:
+            return (
+                "// No vehicle-width points yet. Mark both edges at a distance in\n"
+                "// the Calibrate tab to get the corridor lines.\n"
+                "const uint8_t WIDTH_COUNT = 0;"
+            )
+
+        lines = [
+            "// Vehicle width where it was measured, top of the canvas first so",
+            "// consecutive entries join downward.",
+            "struct WidthPoint {",
+            "  uint8_t row;",
+            "  uint8_t leftX;",
+            "  uint8_t rightX;",
+            "};",
+            "const WidthPoint WIDTH[] = {",
+        ]
+        # widthPoints runs near to far; reversed gives ascending rows.
+        for point in reversed(points):
+            assert point.leftEdge is not None and point.rightEdge is not None
+            lines.append(
+                f"  {{ {calibration.overlayRow(point.scanLine):3d},"
+                f" {calibration.overlayColumn(point.leftEdge):3d},"
+                f" {calibration.overlayColumn(point.rightEdge):3d} }},"
+                f"  // {point.label}"
+            )
+        lines.append("};")
+        lines.append("const uint8_t WIDTH_COUNT = sizeof(WIDTH) / sizeof(WIDTH[0]);")
+        return "\n".join(lines)
+
+    def renderWidthDrawing(self, calibration: Calibration) -> str:
+        if not calibration.widthPoints:
+            return (
+                "void drawWidthLines() {\n"
+                "  // Nothing measured, so there is no corridor to draw.\n"
+                "}"
+            )
+        return f"""#define DASH_LENGTH {appConfig.dashLengthPixels}
+
+// Drawn as a polyline through the measured points rather than as a straight
+// taper. The camera is wide-angle, so the true edges of the vehicle's path
+// curve across the picture and a straight line would lie about where they run.
+void drawWidthLines() {{
+  for (uint8_t i = 0; i + 1 < WIDTH_COUNT; i++) {{
+    drawDashedEdge(WIDTH[i].leftX, WIDTH[i].row, WIDTH[i + 1].leftX, WIDTH[i + 1].row);
+    drawDashedEdge(WIDTH[i].rightX, WIDTH[i].row, WIDTH[i + 1].rightX, WIDTH[i + 1].row);
+  }}
+}}
+
+// These run close to vertical, so stepping down the rows and interpolating the
+// column keeps the dashes evenly spaced.
+void drawDashedEdge(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {{
+  if (y1 <= y0) {{
+    return;
+  }}
+  int16_t run = (int16_t)y1 - (int16_t)y0;
+  int16_t rise = (int16_t)x1 - (int16_t)x0;
+  for (uint8_t y = y0; y <= y1; y++) {{
+    if (((y / DASH_LENGTH) & 1) != 0) {{
+      continue;
+    }}
+    int16_t x = (int16_t)x0 + rise * (int16_t)(y - y0) / run;
+    if (x >= 0 && x < W) {{
+      tv.set_pixel((uint8_t)x, y, 1);
+    }}
+  }}
+}}"""
+
     def thicknessFor(self, distanceFeet: float) -> int:
         """Heavier line for the distances worth noticing at a glance."""
         emphasised = {round(value, 1) for value in appConfig.emphasisedDistancesFeet}
@@ -260,7 +338,8 @@ class SketchService:
             lines.append(
                 f"  {{ {row:3d}, {thickness}, {labelX:3d}, {labelY:3d}, {width:3d}, "
                 f"{quoted:<{quotedWidth}} }},"
-                f"  // scan line {point.scanLine} of {calibration.frameHeight}{emphasis}"
+                f"  // scan line {point.scanLine} of {calibration.frameHeight},"
+                f" frame {point.frameIndex}{emphasis}"
             )
         return "\n".join(lines)
 

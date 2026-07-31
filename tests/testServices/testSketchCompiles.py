@@ -41,12 +41,28 @@ needsToolchain = pytest.mark.skipif(
 )
 
 
-@needsToolchain
-def testGeneratedSketchCompilesForAnUno(tmp_path: Path) -> None:
+def compileSketch(calibration: Calibration, tmp_path: Path) -> subprocess.CompletedProcess:
+    assert arduinoCli is not None
+    # The Arduino IDE requires the .ino to sit in a folder of the same name.
+    sketchDir = tmp_path / "rvbhGrid"
+    SketchService().save(calibration, sketchDir / "rvbhGrid.ino")
+    return subprocess.run(
+        [arduinoCli, "compile", "--fqbn", fqbn, str(sketchDir)],
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+
+
+def skipWithoutLibraries() -> None:
     assert arduinoCli is not None
     if not librariesInstalled(arduinoCli):
         pytest.skip("the TVout-VE libraries are not installed")
 
+
+@needsToolchain
+def testGeneratedSketchCompilesForAnUno(tmp_path: Path) -> None:
+    skipWithoutLibraries()
     calibration = Calibration(
         frameWidth=640,
         frameHeight=480,
@@ -59,18 +75,34 @@ def testGeneratedSketchCompilesForAnUno(tmp_path: Path) -> None:
         sourceClip="rvbh-20260727-101154.avi",
         frameIndex=137,
     )
-    # The Arduino IDE requires the .ino to sit in a folder of the same name.
-    sketchDir = tmp_path / "rvbhGrid"
-    SketchService().save(calibration, sketchDir / "rvbhGrid.ino")
 
-    result = subprocess.run(
-        [arduinoCli, "compile", "--fqbn", fqbn, str(sketchDir)],
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
+    result = compileSketch(calibration, tmp_path)
 
     assert result.returncode == 0, (
         f"sketch did not compile:\n{result.stdout}\n{result.stderr}"
+    )
+    assert "Sketch uses" in result.stdout
+
+
+@needsToolchain
+def testSketchWithVehicleWidthCompiles(tmp_path: Path) -> None:
+    """The dashed-corridor path is a whole extra body of generated C."""
+    skipWithoutLibraries()
+    calibration = Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[
+            CalibrationPoint(0.0, 461, leftEdge=40, rightEdge=600, frameIndex=1853),
+            CalibrationPoint(4.0, 316, leftEdge=120, rightEdge=520, frameIndex=2265),
+            CalibrationPoint(8.0, 193, leftEdge=180, rightEdge=460, frameIndex=3089),
+            CalibrationPoint(20.0, 23, leftEdge=250, rightEdge=390, frameIndex=3913),
+        ],
+        sourceClip="rvbh-20260730-100335.avi",
+    )
+
+    result = compileSketch(calibration, tmp_path)
+
+    assert result.returncode == 0, (
+        f"width sketch did not compile:\n{result.stdout}\n{result.stderr}"
     )
     assert "Sketch uses" in result.stdout

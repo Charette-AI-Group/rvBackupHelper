@@ -40,13 +40,7 @@ class CalibrationService:
             "overlayCanvasWidth": appConfig.overlayCanvasWidth,
             "overlayCanvasHeight": appConfig.overlayCanvasHeight,
             "points": [
-                {
-                    "distanceFeet": point.distanceFeet,
-                    "scanLine": point.scanLine,
-                    # Written for readers that do not want to redo the maths;
-                    # scanLine plus frameHeight remains the source of truth.
-                    "overlayRow": calibration.overlayRow(point.scanLine),
-                }
+                self.pointPayload(calibration, point)
                 for point in calibration.sortedPoints
             ],
         }
@@ -54,6 +48,39 @@ class CalibrationService:
         path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         logger.info("Saved %d calibration point(s) to %s", len(calibration.points), path)
         return path
+
+    def pointPayload(self, calibration: Calibration, point: CalibrationPoint) -> dict:
+        payload = {
+            "distanceFeet": point.distanceFeet,
+            "scanLine": point.scanLine,
+            "frameIndex": point.frameIndex,
+            # Written for readers that do not want to redo the maths;
+            # scanLine plus frameHeight remains the source of truth.
+            "overlayRow": calibration.overlayRow(point.scanLine),
+        }
+        # Width is optional: a calibration is useful with distances alone.
+        if point.leftEdge is not None:
+            payload["leftEdge"] = point.leftEdge
+            payload["overlayLeft"] = calibration.overlayColumn(point.leftEdge)
+        if point.rightEdge is not None:
+            payload["rightEdge"] = point.rightEdge
+            payload["overlayRight"] = calibration.overlayColumn(point.rightEdge)
+        return payload
+
+    def readPoint(self, item: dict, legacyFrameIndex: int) -> CalibrationPoint:
+        edges = {
+            name: int(item[name])
+            for name in ("leftEdge", "rightEdge")
+            if item.get(name) is not None
+        }
+        return CalibrationPoint(
+            distanceFeet=float(item["distanceFeet"]),
+            scanLine=int(item["scanLine"]),
+            # Files written before frames were per-point fall back to the
+            # calibration-wide one rather than losing the provenance.
+            frameIndex=int(item.get("frameIndex", legacyFrameIndex)),
+            **edges,
+        )
 
     def load(self, path: Path) -> Calibration:
         payload = self.readPayload(path)
@@ -63,20 +90,17 @@ class CalibrationService:
                 f"{path.name} is format version {version!r}; "
                 f"this build reads version {calibrationFormatVersion}."
             )
+        legacyFrameIndex = int(payload.get("frameIndex", 0))
         try:
             points = [
-                CalibrationPoint(
-                    distanceFeet=float(item["distanceFeet"]),
-                    scanLine=int(item["scanLine"]),
-                )
-                for item in payload["points"]
+                self.readPoint(item, legacyFrameIndex) for item in payload["points"]
             ]
             calibration = Calibration(
                 frameWidth=int(payload["frameWidth"]),
                 frameHeight=int(payload["frameHeight"]),
                 points=points,
                 sourceClip=str(payload.get("sourceClip", "")),
-                frameIndex=int(payload.get("frameIndex", 0)),
+                frameIndex=legacyFrameIndex,
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise CalibrationError(f"{path.name} has missing or invalid fields: {exc}") from exc

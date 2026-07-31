@@ -246,6 +246,94 @@ def testSketchBreaksTheLineAroundTheLabel(sketch: str) -> None:
     assert "tv.draw_line(0, GRID[i].row, W - 1" not in sketch
 
 
+widthEntry = re.compile(r"\{\s*(\d+),\s*(\d+),\s*(\d+)\s*\}")
+
+
+def widthRows(sketch: str) -> list[tuple[int, int, int]]:
+    section = sketch.split("const WidthPoint WIDTH[] = {")[1].split("};")[0]
+    return [
+        (int(row), int(left), int(right))
+        for row, left, right in widthEntry.findall(section)
+    ]
+
+
+def withWidth() -> Calibration:
+    return Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[
+            CalibrationPoint(2.0, 388, leftEdge=60, rightEdge=580),
+            CalibrationPoint(8.0, 193, leftEdge=180, rightEdge=460),
+            CalibrationPoint(20.0, 23, leftEdge=250, rightEdge=390),
+        ],
+    )
+
+
+def testWidthRowsRunTopOfCanvasDownwards() -> None:
+    """Consecutive entries are joined, so they have to be in drawing order."""
+    rows = widthRows(SketchService().generate(withWidth()))
+
+    assert [row for row, _, _ in rows] == sorted(row for row, _, _ in rows)
+    # 23, 193 and 388 of 480 onto the 96-row canvas.
+    assert [row for row, _, _ in rows] == [5, 39, 78]
+
+
+def testWidthColumnsAreRescaledOntoTheCanvas() -> None:
+    rows = widthRows(SketchService().generate(withWidth()))
+
+    # Entries run far to near, and the corridor narrows with distance: the far
+    # end's left edge sits further right, its right edge further left.
+    farLeft, farRight = rows[0][1], rows[0][2]
+    nearLeft, nearRight = rows[-1][1], rows[-1][2]
+    assert farLeft > nearLeft
+    assert farRight < nearRight
+    assert rows[-1] == (78, 13, 123)  # 60 and 580 of 640 onto 136
+
+
+def testWidthEdgesAreDrawnDashed() -> None:
+    sketch = SketchService().generate(withWidth())
+
+    assert "DASH_LENGTH" in sketch
+    assert "void drawDashedEdge" in sketch
+    assert "tv.set_pixel" in sketch
+    assert "drawWidthLines();" in sketch
+
+
+def testPointsWithOnlyOneEdgeAreLeftOutOfTheCorridor() -> None:
+    calibration = Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[
+            CalibrationPoint(2.0, 388, leftEdge=60, rightEdge=580),
+            CalibrationPoint(8.0, 193, leftEdge=180),
+            CalibrationPoint(20.0, 23, leftEdge=250, rightEdge=390),
+        ],
+    )
+
+    assert [row for row, _, _ in widthRows(SketchService().generate(calibration))] == [
+        5,
+        78,
+    ]
+
+
+def testACalibrationWithoutWidthStillGeneratesACleanSketch(sketch: str) -> None:
+    """Distances alone remain a complete, compilable grid."""
+    assert "const uint8_t WIDTH_COUNT = 0;" in sketch
+    assert "struct WidthPoint" not in sketch
+    assert "void drawWidthLines()" in sketch
+    assert sketch.count("{") == sketch.count("}")
+
+
+def testGridRowsRecordTheFrameEachWasMeasuredOn() -> None:
+    calibration = Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[CalibrationPoint(4.0, 316, frameIndex=2265)],
+    )
+
+    assert "frame 2265" in SketchService().generate(calibration)
+
+
 def testGeneratingWithNoPointsRaises() -> None:
     with pytest.raises(SketchError, match="no points"):
         SketchService().generate(Calibration(frameWidth=640, frameHeight=480))

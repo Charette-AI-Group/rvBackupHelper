@@ -13,12 +13,14 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QButtonGroup,
     QDoubleSpinBox,
     QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QRadioButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -26,7 +28,11 @@ from PySide6.QtWidgets import (
 )
 
 from rvBackupHelper import appConfig
-from rvBackupHelper.models.calibrationModels import Calibration, CalibrationPoint
+from rvBackupHelper.models.calibrationModels import (
+    Calibration,
+    CalibrationPoint,
+    Edge,
+)
 from rvBackupHelper.models.captureModels import ClipInfo
 from rvBackupHelper.services.calibration.calibrationService import (
     CalibrationError,
@@ -47,9 +53,14 @@ sketchFilter = "Arduino sketches (*.ino);;All files (*)"
 panelWidth = 320
 instructions = (
     "Open the clip you recorded behind the RV and step to the frame where your "
-    "distance markers are readable. Set the distance below, then click that "
-    "marker in the image."
+    "marker is readable. Set the distance, choose what you are marking, then "
+    "click that spot in the image. Mark the distance line before its edges."
 )
+# What a click on the picture means. Distance first: it has to exist before an
+# edge has anything to attach to.
+markDistance = "Distance line"
+markLeft = "Left edge"
+markRight = "Right edge"
 
 
 class CalibrationView(QWidget):
@@ -102,8 +113,18 @@ class CalibrationView(QWidget):
         distanceRow.addWidget(QLabel("Distance:"))
         distanceRow.addWidget(self.distanceSpin, stretch=1)
 
-        self.pointsTable = QTableWidget(0, 3)
-        self.pointsTable.setHorizontalHeaderLabels(["Distance", "Scan line", "OSD row"])
+        self.markGroup = QButtonGroup(self)
+        markRow = QHBoxLayout()
+        for index, text in enumerate((markDistance, markLeft, markRight)):
+            button = QRadioButton(text)
+            button.setChecked(index == 0)
+            self.markGroup.addButton(button, index)
+            markRow.addWidget(button)
+
+        self.pointsTable = QTableWidget(0, 5)
+        self.pointsTable.setHorizontalHeaderLabels(
+            ["Distance", "Scan line", "OSD row", "Left", "Right"]
+        )
         self.pointsTable.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.pointsTable.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
@@ -139,6 +160,7 @@ class CalibrationView(QWidget):
         layout = QVBoxLayout(panel)
         layout.addWidget(instructionLabel)
         layout.addLayout(distanceRow)
+        layout.addLayout(markRow)
         layout.addWidget(self.pointsTable, stretch=1)
         layout.addLayout(buttons)
         layout.addWidget(self.summaryLabel)
@@ -166,15 +188,44 @@ class CalibrationView(QWidget):
         self.calibration.sourceClip = clipInfo.path.name
         self.refresh()
 
+    def markMode(self) -> str:
+        button = self.markGroup.checkedButton()
+        return button.text() if button is not None else markDistance
+
     def onFramePointClicked(self, x: int, y: int) -> None:
         if self.clipBrowser.clipInfo is None:
-            self.statusMessage.emit("Open a clip before marking distances.")
+            self.statusMessage.emit("Open a clip before marking.")
             return
-        point = CalibrationPoint(distanceFeet=self.distanceSpin.value(), scanLine=y)
+        frameIndex = self.clipBrowser.currentFrameIndex
+        mode = self.markMode()
+        if mode == markDistance:
+            self.markDistanceLine(y, frameIndex)
+        else:
+            self.markWidthEdge(
+                Edge.left if mode == markLeft else Edge.right, x, frameIndex
+            )
+
+    def markDistanceLine(self, scanLine: int, frameIndex: int) -> None:
+        point = CalibrationPoint(
+            distanceFeet=self.distanceSpin.value(),
+            scanLine=scanLine,
+            frameIndex=frameIndex,
+        )
         self.calibration.addPoint(point)
-        self.calibration.frameIndex = self.clipBrowser.currentFrameIndex
+        self.calibration.frameIndex = frameIndex
         self.refresh()
-        self.statusMessage.emit(f"Marked {point.label} at scan line {y}.")
+        self.statusMessage.emit(f"Marked {point.label} at scan line {scanLine}.")
+
+    def markWidthEdge(self, edge: Edge, x: int, frameIndex: int) -> None:
+        distance = self.distanceSpin.value()
+        if not self.calibration.setEdge(distance, edge, x, frameIndex):
+            self.statusMessage.emit(
+                f"Mark the {distance:g} ft distance line before its edges."
+            )
+            return
+        self.calibration.frameIndex = frameIndex
+        self.refresh()
+        self.statusMessage.emit(f"Marked the {edge} edge of {distance:g} ft at x={x}.")
 
     def selectedDistance(self) -> float | None:
         row = self.pointsTable.currentRow()
@@ -274,6 +325,7 @@ class CalibrationView(QWidget):
     def refresh(self) -> None:
         self.refreshTable()
         self.clipBrowser.videoDisplay.setMarkers(self.calibration.markers())
+        self.clipBrowser.videoDisplay.setEdgeMarkers(self.calibration.edgeMarkers())
         self.updateSummary()
         self.updateControls()
 
@@ -285,6 +337,8 @@ class CalibrationView(QWidget):
                 point.label,
                 str(point.scanLine),
                 str(self.calibration.overlayRow(point.scanLine)),
+                "-" if point.leftEdge is None else str(point.leftEdge),
+                "-" if point.rightEdge is None else str(point.rightEdge),
             )
             for column, value in enumerate(values):
                 self.pointsTable.setItem(row, column, QTableWidgetItem(value))
@@ -296,10 +350,14 @@ class CalibrationView(QWidget):
             return
         frame = f"{self.calibration.frameWidth}x{self.calibration.frameHeight}"
         overlay = f"{appConfig.overlayCanvasWidth}x{appConfig.overlayCanvasHeight}"
+        withWidth = len(self.calibration.widthPoints)
         summary = (
-            f"{len(self.calibration.points)} point(s) measured on a {frame} frame. "
+            f"{len(self.calibration.points)} point(s) measured on a {frame} frame, "
+            f"{withWidth} with both width edges. "
             f"OSD rows are for the {overlay} shield canvas."
         )
+        if withWidth == 1:
+            summary += " Width needs two distances before it can draw a corridor."
         # The canvas is several times shorter than the capture, so close
         # distances can rescale onto one row and become undrawable.
         collisions = self.sketchService.collidingRows(self.calibration)

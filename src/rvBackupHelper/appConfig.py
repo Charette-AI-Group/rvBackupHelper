@@ -82,3 +82,6 @@ emphasisedDistancesFeet = (1.0,)
 emphasisedThickness = 2
 # Clear space either side of a label where its line is broken for it.
 labelGapPixels = 2
+# Dash on/off run for the vehicle-width edges, in canvas pixels. Dashes keep
+# them reading as a corridor rather than as more distance lines.
+dashLengthPixels = 3

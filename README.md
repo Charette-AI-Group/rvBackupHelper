@@ -64,10 +64,23 @@ recorded behind the RV, step to the frame where your distance markers are readab
 distance, then **click that marker in the image**. Each click records the scan line it landed
 on and draws an amber guide there, so you can see immediately whether it sits on the mark.
 
-The table shows three columns: the distance, the **scan line** in the captured frame, and the
-**OSD row** — the same line rescaled onto the shield's 136x96 canvas, which is the number the
-Arduino sketch needs. Re-marking a distance replaces the earlier point rather than stacking
+The table shows the distance, the **scan line** in the captured frame, the **OSD row** — the
+same line rescaled onto the shield's 136x96 canvas, which is what the sketch needs — and the
+**Left** and **Right** width edges. Re-marking replaces the earlier value rather than stacking
 two guides, so correcting a misplaced click is just clicking again.
+
+**Vehicle width.** If you laid a marked pole across each distance, switch the radio button to
+*Left edge* or *Right edge* and click those markings. A green tick shows where each landed.
+Mark the distance line first — an edge with no line has nothing to attach to. Two distances
+with both edges are enough to draw a corridor; the sketch joins them as **dashed converging
+lines**, which is how the driver sees whether the RV will fit.
+
+The corridor is a polyline through the measured points rather than a straight taper, because
+the camera is wide-angle enough that the true edges curve across the picture. More measured
+distances therefore mean a truer corridor.
+
+Each point records the frame it was measured on, since a pole gets moved between distances
+and every measurement comes from its own frame.
 
 **Save…** writes a small JSON file (default `calibration/rvbhCalibration.json`). That file is
 **not** git-ignored — it is the one artefact that can only be produced at the RV, so it
