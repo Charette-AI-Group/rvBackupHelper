@@ -102,6 +102,18 @@ Lay a tape measure (or cones every 2 ft) straight back from the bumper, record t
 use the **Calibrate tab**: step to the frame where the markers are readable, set a distance,
 and click that marker in the image. Each click records the scan line it landed on.
 
+**Vehicle width** is marked the same way: a pole laid across each distance with the RV width
+marked on it, clicked as Left edge and Right edge. Both edges at two or more distances give
+the dashed corridor. It is drawn as a polyline through the measured points, not a straight
+taper, because the camera is wide-angle enough that the true edges curve — more distances
+therefore give a truer corridor. Note the first calibration's "left" values are larger in x
+than its "right" ones, which is what a mirrored camera view gives; it makes no difference to
+the drawing.
+
+**Frame index is per point, not per calibration.** The pole is carried to a new distance for
+every shot, so each measurement comes from its own frame. Files predating this fall back to
+the calibration-wide value.
+
 Saved as JSON under `calibration/` (default `rvbhCalibration.json`), and deliberately **not**
 git-ignored the way `recordings/` is — this cannot be reproduced at a desk or recovered from
 memory, so it belongs in version control. Each point stores `distanceFeet`, `scanLine`, and
@@ -117,6 +129,60 @@ Two things that bit during implementation and are pinned by tests:
   pixel low — a systematic error in the exact number the feature exists to produce.
 - **`ClipBrowser.showFrame()` goes through the slider**, otherwise the transport controls end
   up contradicting the position label.
+
+## Where the project stands (2026-07-30)
+
+The whole chain works end to end with real measurements: RV camera → recorded clip →
+distance and width calibration → JSON → generated sketch → flashed Arduino → grid and
+dashed width corridor on the display, all confirmed by capture.
+
+**Open item, being worked on: the RV footage is washed out.** This is almost certainly not
+sun on concrete. Measured on frame 2265 of `rvbh-20260730-100335.avi`: mean 211, **1st
+percentile 116**, 99th percentile 254. Blacks sitting at 116 rather than near zero means the
+whole signal is lifted and compressed, which is a *level* problem, not exposure — an
+auto-exposure camera would still produce near-black blacks. The classic cause is a missing or
+doubled **75 ohm termination** somewhere in the path, which roughly doubles amplitude.
+
+Cheapest test: feed the camera straight into the USB grabber, bypassing the shield entirely.
+If that picture is clean, the shield or its cabling is lifting the level; if it is still
+washed out, the fault is upstream in the RV wiring, which was installed over a year ago.
+
+A second calibration is planned once that is fixed — the pole markings were too hard to see
+to trust the far distances.
+
+## The Uno is out of RAM, and the compiler hides it
+
+This is the constraint that will bite any future change to the sketch.
+
+`TVout::begin()` mallocs `(136/8) * 96 = 1632` bytes at runtime and pollserial mallocs 64
+more, so **1696 of the Uno's 2048 bytes are gone before anything else runs** — and none of it
+appears in the compiler's "global variables" figure. A build reporting "4% of dynamic memory"
+is not roomy.
+
+Two things keep it viable, and both were needed:
+
+- **pollserial, never HardwareSerial.** Its static 64-byte receive and transmit buffers took
+  globals to 354, leaving about 60 bytes of stack, which will not run. pollserial ships with
+  TVout-VE for exactly this, and polls from `set_hbi_hook` during blanking rather than from an
+  interrupt, so it also stays clear of video generation.
+- **Grid tables and labels in PROGMEM**, read back with `memcpy_P` and drawn with
+  `tv.printPGM`. That took globals from 201 to 99, leaving roughly 250 bytes of stack.
+
+`testSketchCompiles.py` asserts at least 200 bytes of stack remain after both allocations, so
+this cannot creep back silently as more calibration points are added.
+
+## Turning the overlay off from the app
+
+Capture tab, beside Start Recording. Calibration footage must be recorded with the grid off:
+a burned-in grid sits on top of the very markings you need to click afterwards, which is what
+spoiled the first calibration.
+
+The sketch takes single-character commands (`g`, `c`, `?`) over serial and answers with its
+state. **The wanted state lives in EEPROM** because opening a serial port resets the Uno and
+no host can avoid that; without it, closing the port would bring the grid straight back. The
+port is opened and closed per command rather than held, so `arduino-cli` can still upload.
+
+The bring-up sketch does not accept commands — the toggle reports that rather than hanging.
 
 ## Sketch generation
 
