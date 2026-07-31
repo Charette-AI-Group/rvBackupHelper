@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import cv2
@@ -78,6 +79,16 @@ def testMarkingRecordsWhichFrameItWasMeasuredOn(
     viewWithClip.onFramePointClicked(100, 300)
 
     assert viewWithClip.calibration.frameIndex == 2
+
+
+def testBumperLineAtZeroFeetCanBeEntered(viewWithClip: CalibrationView) -> None:
+    """The first real calibration wanted a line on the bumper itself."""
+    viewWithClip.distanceSpin.setValue(0.0)
+
+    viewWithClip.onFramePointClicked(320, 461)
+
+    assert viewWithClip.calibration.points[0].distanceFeet == 0.0
+    assert viewWithClip.calibration.points[0].label == "0 ft"
 
 
 def testClickingWithoutAClipIsRefused(view: CalibrationView) -> None:
@@ -213,7 +224,8 @@ def testGeneratingASketchWritesACompilableFile(
 
     sketch = target.read_text(encoding="utf-8")
     assert "#include <TVout.h>" in sketch
-    assert '{  86, "3 ft" }' in sketch
+    # Row and label, without pinning the struct's field layout.
+    assert re.search(r'\{\s*86,.*"3 ft"', sketch)
     assert "clip.avi" in sketch
 
 

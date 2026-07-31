@@ -61,8 +61,10 @@ defaultCalibrationName = f"rvbhCalibration{calibrationExtension}"
 overlayCanvasWidth = 136
 overlayCanvasHeight = 96
 
-# Sensible bounds for a distance entered while calibrating, in feet.
-minimumDistanceFeet = 0.5
+# Sensible bounds for a distance entered while calibrating, in feet. Zero is
+# allowed on purpose: the first real calibration wanted a line on the bumper
+# itself, and a 0.5 minimum forced that to be hand-edited into the saved file.
+minimumDistanceFeet = 0.0
 maximumDistanceFeet = 200.0
 defaultDistanceFeet = 3.0
 

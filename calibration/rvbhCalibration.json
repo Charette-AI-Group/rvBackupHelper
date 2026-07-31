@@ -1,31 +1,46 @@
 {
   "version": 1,
-  "sourceClip": "rvbh-20260727-104905.avi",
-  "frameIndex": 256,
+  "sourceClip": "rvbh-20260730-100335.avi",
+  "frameIndex": 3998,
   "frameWidth": 640,
   "frameHeight": 480,
   "overlayCanvasWidth": 136,
   "overlayCanvasHeight": 96,
   "points": [
     {
-      "distanceFeet": 0.5,
-      "scanLine": 477,
-      "overlayRow": 95
+      "distanceFeet": 0.0,
+      "scanLine": 461,
+      "overlayRow": 92
     },
     {
-      "distanceFeet": 3.0,
-      "scanLine": 406,
-      "overlayRow": 81
+      "distanceFeet": 1.0,
+      "scanLine": 427,
+      "overlayRow": 85
     },
     {
-      "distanceFeet": 4.5,
-      "scanLine": 371,
-      "overlayRow": 74
+      "distanceFeet": 2.0,
+      "scanLine": 388,
+      "overlayRow": 78
     },
     {
-      "distanceFeet": 6.0,
-      "scanLine": 323,
-      "overlayRow": 65
+      "distanceFeet": 4.0,
+      "scanLine": 316,
+      "overlayRow": 63
+    },
+    {
+      "distanceFeet": 8.0,
+      "scanLine": 193,
+      "overlayRow": 39
+    },
+    {
+      "distanceFeet": 16.0,
+      "scanLine": 58,
+      "overlayRow": 12
+    },
+    {
+      "distanceFeet": 20.0,
+      "scanLine": 23,
+      "overlayRow": 5
     }
   ]
 }

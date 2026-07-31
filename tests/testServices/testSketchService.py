@@ -39,11 +39,18 @@ def sketch(calibration: Calibration) -> str:
     )
 
 
+gridEntry = re.compile(r"\{\s*(\d+),\s*(\d+),\s*(\d+),\s*\"([^\"]+)\"\s*\}")
+
+
 def gridRows(sketch: str) -> list[tuple[int, str]]:
     """The (row, label) pairs actually emitted into the GRID array."""
+    return [(int(row), label) for row, _, _, label in gridEntry.findall(sketch)]
+
+
+def gridLabels(sketch: str) -> list[tuple[int, int, str]]:
+    """The (labelX, labelY, label) placements emitted into the GRID array."""
     return [
-        (int(row), label)
-        for row, label in re.findall(r"\{\s*(\d+),\s*\"([^\"]+)\"\s*\}", sketch)
+        (int(x), int(y), label) for _, x, y, label in gridEntry.findall(sketch)
     ]
 
 
@@ -90,6 +97,70 @@ def testBracesAreBalanced(sketch: str) -> None:
     """Cheap guard that templating did not mangle the C structure."""
     assert sketch.count("{") == sketch.count("}")
     assert sketch.count("(") == sketch.count(")")
+
+
+def testLabelsNeverOverlapOnRealRvData() -> None:
+    """Regression: the first real calibration put two labels on top of each other.
+
+    Rows 5 and 12 are seven apart, but the top-of-canvas clamp pushes the
+    upper label down to y=7 while the lower one sits at y=5 — two rows apart,
+    with 6px glyphs. On screen they merged into unreadable mush.
+    """
+    calibration = Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[
+            CalibrationPoint(0.5, 461),
+            CalibrationPoint(1.0, 427),
+            CalibrationPoint(2.0, 388),
+            CalibrationPoint(4.0, 316),
+            CalibrationPoint(8.0, 193),
+            CalibrationPoint(16.0, 58),
+            CalibrationPoint(20.0, 23),
+        ],
+        sourceClip="rvbh-20260730-100335.avi",
+        frameIndex=3998,
+    )
+
+    labels = gridLabels(SketchService().generate(calibration))
+
+    assert len(labels) == 7
+    for index, (x, y, label) in enumerate(labels):
+        for otherX, otherY, otherLabel in labels[index + 1 :]:
+            verticallyClose = abs(y - otherY) < 6
+            horizontallyClose = (
+                x < otherX + 4 * len(otherLabel) and otherX < x + 4 * len(label)
+            )
+            assert not (verticallyClose and horizontallyClose), (
+                f"'{label}' at ({x},{y}) overlaps '{otherLabel}' at ({otherX},{otherY})"
+            )
+
+
+def testCrowdedLabelsMoveToTheOppositeSide() -> None:
+    calibration = Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[CalibrationPoint(16.0, 58), CalibrationPoint(20.0, 23)],
+    )
+
+    labels = gridLabels(SketchService().generate(calibration))
+
+    # One stays left, the other is pushed right rather than being drawn over it.
+    assert min(x for x, _, _ in labels) <= 2
+    assert max(x for x, _, _ in labels) > 50
+
+
+def testLabelsStayInsideTheCanvas() -> None:
+    calibration = Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[CalibrationPoint(16.0, 58), CalibrationPoint(20.0, 23)],
+    )
+
+    for x, y, label in gridLabels(SketchService().generate(calibration)):
+        assert 0 <= x
+        assert x + 4 * len(label) <= appConfig.overlayCanvasWidth
+        assert 0 <= y < appConfig.overlayCanvasHeight
 
 
 def testGeneratingWithNoPointsRaises() -> None:

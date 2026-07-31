@@ -74,6 +74,8 @@ TVout tv;
 
 struct GridLine {
   uint8_t row;         // row in the overlay canvas, 0 = top
+  uint8_t labelX;      // placed by the generator to avoid label collisions
+  uint8_t labelY;
   const char *label;   // distance as shown to the driver
 };
 
@@ -124,11 +126,8 @@ ISR(INT0_vect) {
 
 void drawGrid() {
   for (uint8_t i = 0; i < GRID_COUNT; i++) {
-    uint8_t row = GRID[i].row;
-    tv.draw_line(0, row, W - 1, row, 1);
-    // Label above the line, or just below it when the line is at the very top.
-    uint8_t labelY = (row >= $labelHeight) ? (row - $labelHeight) : (row + 2);
-    tv.print(1, labelY, GRID[i].label);
+    tv.draw_line(0, GRID[i].row, W - 1, GRID[i].row, 1);
+    tv.print(GRID[i].labelX, GRID[i].labelY, GRID[i].label);
   }
 }
 
@@ -139,8 +138,13 @@ void loop() {
 """
 )
 
-# font4x6 glyphs are 6 rows tall; one more keeps the label off the line.
+# font4x6: glyphs are 4 px wide and 6 tall.
+glyphWidth = 4
+glyphHeight = 6
+# One more than the glyph height keeps the label clear of its own line.
 labelHeightPixels = 7
+leftMargin = 1
+rightMargin = 2
 
 
 class SketchService:
@@ -182,17 +186,45 @@ class SketchService:
             gridRows=self.renderRows(calibration),
         )
 
+    def labelPosition(
+        self, row: int, label: str, placed: list[tuple[int, int, int]]
+    ) -> tuple[int, int]:
+        """Where to print a label so it does not land on an earlier one.
+
+        Labels sit above their line, or just below when the line is too near
+        the top to fit one above. That clamp is what makes collisions possible:
+        two lines seven rows apart can end up with labels two rows apart. When
+        the left-hand slot is taken, the label goes to the right instead.
+        """
+        labelY = row - labelHeightPixels if row >= labelHeightPixels else row + 2
+        width = glyphWidth * len(label)
+        left = leftMargin
+        right = max(leftMargin, appConfig.overlayCanvasWidth - rightMargin - width)
+        for x in (left, right):
+            if not any(
+                abs(labelY - otherY) < glyphHeight
+                and x < otherX + otherWidth
+                and otherX < x + width
+                for otherX, otherY, otherWidth in placed
+            ):
+                return x, labelY
+        # Both slots taken: keep it on the right rather than over the left label.
+        return right, labelY
+
     def renderRows(self, calibration: Calibration) -> str:
         points = calibration.sortedPoints
         # Pad to the longest label so the trailing comments line up; this file
         # gets read by a human deciding whether the grid looks right.
-        labelWidth = max(len(point.label) for point in points) + 2
+        quotedWidth = max(len(point.label) for point in points) + 2
+        placed: list[tuple[int, int, int]] = []
         lines = []
         for point in points:
             row = calibration.overlayRow(point.scanLine)
+            labelX, labelY = self.labelPosition(row, point.label, placed)
+            placed.append((labelX, labelY, glyphWidth * len(point.label)))
             quoted = f'"{point.label}"'
             lines.append(
-                f"  {{ {row:3d}, {quoted:<{labelWidth}} }},"
+                f"  {{ {row:3d}, {labelX:3d}, {labelY:3d}, {quoted:<{quotedWidth}} }},"
                 f"  // scan line {point.scanLine} of {calibration.frameHeight}"
             )
         return "\n".join(lines)
