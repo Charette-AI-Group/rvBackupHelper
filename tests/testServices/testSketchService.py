@@ -39,18 +39,35 @@ def sketch(calibration: Calibration) -> str:
     )
 
 
-gridEntry = re.compile(r"\{\s*(\d+),\s*(\d+),\s*(\d+),\s*\"([^\"]+)\"\s*\}")
+gridEntry = re.compile(
+    r"\{\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*\"([^\"]+)\"\s*\}"
+)
+
+
+def gridEntries(sketch: str) -> list[dict]:
+    """Every GRID row as a dict, so tests do not index into a tuple."""
+    return [
+        {
+            "row": int(row),
+            "thickness": int(thickness),
+            "labelX": int(labelX),
+            "labelY": int(labelY),
+            "labelWidth": int(labelWidth),
+            "label": label,
+        }
+        for row, thickness, labelX, labelY, labelWidth, label in gridEntry.findall(sketch)
+    ]
 
 
 def gridRows(sketch: str) -> list[tuple[int, str]]:
     """The (row, label) pairs actually emitted into the GRID array."""
-    return [(int(row), label) for row, _, _, label in gridEntry.findall(sketch)]
+    return [(entry["row"], entry["label"]) for entry in gridEntries(sketch)]
 
 
 def gridLabels(sketch: str) -> list[tuple[int, int, str]]:
     """The (labelX, labelY, label) placements emitted into the GRID array."""
     return [
-        (int(x), int(y), label) for _, x, y, label in gridEntry.findall(sketch)
+        (entry["labelX"], entry["labelY"], entry["label"]) for entry in gridEntries(sketch)
     ]
 
 
@@ -137,15 +154,20 @@ def testLabelsNeverOverlapOnRealRvData() -> None:
 
 
 def testCrowdedLabelsMoveToTheOppositeSide() -> None:
+    """Lines closer together than a glyph is tall still need the right slot.
+
+    Centring labels in their own lines fixed the common case, but two lines
+    two rows apart would still overlap on the left.
+    """
     calibration = Calibration(
         frameWidth=640,
         frameHeight=480,
-        points=[CalibrationPoint(16.0, 58), CalibrationPoint(20.0, 23)],
+        # Scan lines 100 and 110 rescale onto rows 20 and 22.
+        points=[CalibrationPoint(3.0, 100), CalibrationPoint(4.0, 110)],
     )
 
     labels = gridLabels(SketchService().generate(calibration))
 
-    # One stays left, the other is pushed right rather than being drawn over it.
     assert min(x for x, _, _ in labels) <= 2
     assert max(x for x, _, _ in labels) > 50
 
@@ -154,13 +176,74 @@ def testLabelsStayInsideTheCanvas() -> None:
     calibration = Calibration(
         frameWidth=640,
         frameHeight=480,
-        points=[CalibrationPoint(16.0, 58), CalibrationPoint(20.0, 23)],
+        # Includes the topmost and bottommost rows the canvas allows.
+        points=[
+            CalibrationPoint(0.0, 479),
+            CalibrationPoint(3.0, 100),
+            CalibrationPoint(4.0, 110),
+            CalibrationPoint(20.0, 0),
+        ],
     )
 
     for x, y, label in gridLabels(SketchService().generate(calibration)):
         assert 0 <= x
         assert x + 4 * len(label) <= appConfig.overlayCanvasWidth
-        assert 0 <= y < appConfig.overlayCanvasHeight
+        assert 0 <= y
+        assert y + 6 <= appConfig.overlayCanvasHeight
+
+
+def testLabelsSitOnTheirOwnLineNotTheNeighbouringOne(sketch: str) -> None:
+    """The label is centred in its line, which is what pairs the two.
+
+    Floating labels above the line put "0 ft" exactly on the 1 ft line when
+    rows were 7 apart, which is how the first real grid became ambiguous.
+    """
+    for entry in gridEntries(sketch):
+        labelCentre = entry["labelY"] + 3
+        assert abs(labelCentre - entry["row"]) <= 1, entry
+
+
+def testOneFootLineIsDrawnHeavier() -> None:
+    calibration = Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[
+            CalibrationPoint(0.0, 461),
+            CalibrationPoint(1.0, 427),
+            CalibrationPoint(4.0, 316),
+        ],
+    )
+
+    entries = gridEntries(SketchService().generate(calibration))
+    byLabel = {entry["label"]: entry["thickness"] for entry in entries}
+
+    assert byLabel == {"0 ft": 1, "1 ft": 2, "4 ft": 1}
+
+
+def testEmphasisFollowsTheConfiguredDistances(monkeypatch) -> None:
+    monkeypatch.setattr(appConfig, "emphasisedDistancesFeet", (4.0,))
+    calibration = Calibration(
+        frameWidth=640,
+        frameHeight=480,
+        points=[CalibrationPoint(1.0, 427), CalibrationPoint(4.0, 316)],
+    )
+
+    entries = gridEntries(SketchService().generate(calibration))
+    byLabel = {entry["label"]: entry["thickness"] for entry in entries}
+
+    assert byLabel == {"1 ft": 1, "4 ft": 2}
+
+
+def testLabelWidthMatchesTheTextSoTheBreakFits(sketch: str) -> None:
+    for entry in gridEntries(sketch):
+        assert entry["labelWidth"] == 4 * len(entry["label"])
+
+
+def testSketchBreaksTheLineAroundTheLabel(sketch: str) -> None:
+    assert "void drawBrokenLine" in sketch
+    assert "LABEL_GAP" in sketch
+    # The single full-width draw is gone.
+    assert "tv.draw_line(0, GRID[i].row, W - 1" not in sketch
 
 
 def testGeneratingWithNoPointsRaises() -> None:

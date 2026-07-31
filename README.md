@@ -87,9 +87,16 @@ The panel warns before generating if two distances land on the same OSD row: the
 five times taller than the shield's canvas, so distances a few scan lines apart can collapse
 onto one row that the hardware cannot draw apart.
 
-The lines run the full width of the picture. Tapering them to suggest perspective would imply
-a width that has not been measured — the calibration records vertical mapping only. Vehicle-width
-guides would need horizontal calibration, which the tool does not yet collect.
+Each line runs the full width of the picture, **breaking around its own label** so the label
+sits in the line rather than floating above it. The overlay is one bit per pixel with no
+colour available, so being physically part of the line is what pairs a distance with its
+guide. Distances listed in `appConfig.emphasisedDistancesFeet` — 1 ft by default, the "about
+to touch something" line — are drawn double thickness, which is the only hierarchy monochrome
+allows. Thickness grows downward so the far edge stays on the measured line.
+
+Lines are not tapered to suggest perspective: that would imply a width nobody measured, since
+the calibration records vertical mapping only. Vehicle-width guides would need horizontal
+calibration, which the tool does not yet collect.
 
 ## Tests and lint
 

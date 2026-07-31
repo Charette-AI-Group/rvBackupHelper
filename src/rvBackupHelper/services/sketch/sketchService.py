@@ -72,10 +72,14 @@ sketchTemplate = Template(
 
 TVout tv;
 
+#define LABEL_GAP $labelGap
+
 struct GridLine {
   uint8_t row;         // row in the overlay canvas, 0 = top
-  uint8_t labelX;      // placed by the generator to avoid label collisions
+  uint8_t thickness;   // rows of line; more than one marks a distance to watch
+  uint8_t labelX;      // placed by the generator; the line breaks around it
   uint8_t labelY;
+  uint8_t labelWidth;  // pixels, so the break is the right size
   const char *label;   // distance as shown to the driver
 };
 
@@ -126,8 +130,29 @@ ISR(INT0_vect) {
 
 void drawGrid() {
   for (uint8_t i = 0; i < GRID_COUNT; i++) {
-    tv.draw_line(0, GRID[i].row, W - 1, GRID[i].row, 1);
+    drawBrokenLine(GRID[i]);
     tv.print(GRID[i].labelX, GRID[i].labelY, GRID[i].label);
+  }
+}
+
+// The label sits in a gap in its own line rather than floating above it. With
+// no colour to pair them, being physically part of the line is what makes it
+// unambiguous which distance a label belongs to.
+void drawBrokenLine(const GridLine &line) {
+  uint8_t gapStart = (line.labelX > LABEL_GAP) ? (line.labelX - LABEL_GAP) : 0;
+  uint16_t gapEnd = line.labelX + line.labelWidth + LABEL_GAP;
+  for (uint8_t step = 0; step < line.thickness; step++) {
+    // Thickness grows downward, so the far edge stays on the measured line.
+    uint16_t y = line.row + step;
+    if (y > H - 1) {
+      break;
+    }
+    if (gapStart > 0) {
+      tv.draw_line(0, y, gapStart, y, 1);
+    }
+    if (gapEnd < W - 1) {
+      tv.draw_line(gapEnd, y, W - 1, y, 1);
+    }
   }
 }
 
@@ -141,8 +166,6 @@ void loop() {
 # font4x6: glyphs are 4 px wide and 6 tall.
 glyphWidth = 4
 glyphHeight = 6
-# One more than the glyph height keeps the label clear of its own line.
-labelHeightPixels = 7
 leftMargin = 1
 rightMargin = 2
 
@@ -182,21 +205,22 @@ class SketchService:
             canvasHeight=canvasHeight,
             bufferBytes=canvasWidth * canvasHeight // 8,
             generatedAt=stamp,
-            labelHeight=labelHeightPixels,
+            labelGap=appConfig.labelGapPixels,
             gridRows=self.renderRows(calibration),
         )
 
     def labelPosition(
         self, row: int, label: str, placed: list[tuple[int, int, int]]
     ) -> tuple[int, int]:
-        """Where to print a label so it does not land on an earlier one.
+        """Where to print a label so it sits in its own line, clear of others.
 
-        Labels sit above their line, or just below when the line is too near
-        the top to fit one above. That clamp is what makes collisions possible:
-        two lines seven rows apart can end up with labels two rows apart. When
-        the left-hand slot is taken, the label goes to the right instead.
+        The label is centred on its line and the line is broken around it, so
+        a label can never be mistaken for the neighbouring line the way it
+        could when labels floated above. Two lines closer together than a
+        glyph is tall would still collide, so the right-hand slot remains as
+        a fallback.
         """
-        labelY = row - labelHeightPixels if row >= labelHeightPixels else row + 2
+        labelY = max(0, min(row - glyphHeight // 2, appConfig.overlayCanvasHeight - glyphHeight))
         width = glyphWidth * len(label)
         left = leftMargin
         right = max(leftMargin, appConfig.overlayCanvasWidth - rightMargin - width)
@@ -211,6 +235,13 @@ class SketchService:
         # Both slots taken: keep it on the right rather than over the left label.
         return right, labelY
 
+    def thicknessFor(self, distanceFeet: float) -> int:
+        """Heavier line for the distances worth noticing at a glance."""
+        emphasised = {round(value, 1) for value in appConfig.emphasisedDistancesFeet}
+        if round(distanceFeet, 1) in emphasised:
+            return appConfig.emphasisedThickness
+        return 1
+
     def renderRows(self, calibration: Calibration) -> str:
         points = calibration.sortedPoints
         # Pad to the longest label so the trailing comments line up; this file
@@ -220,12 +251,16 @@ class SketchService:
         lines = []
         for point in points:
             row = calibration.overlayRow(point.scanLine)
+            width = glyphWidth * len(point.label)
             labelX, labelY = self.labelPosition(row, point.label, placed)
-            placed.append((labelX, labelY, glyphWidth * len(point.label)))
+            placed.append((labelX, labelY, width))
+            thickness = self.thicknessFor(point.distanceFeet)
             quoted = f'"{point.label}"'
+            emphasis = "  <- emphasised" if thickness > 1 else ""
             lines.append(
-                f"  {{ {row:3d}, {labelX:3d}, {labelY:3d}, {quoted:<{quotedWidth}} }},"
-                f"  // scan line {point.scanLine} of {calibration.frameHeight}"
+                f"  {{ {row:3d}, {thickness}, {labelX:3d}, {labelY:3d}, {width:3d}, "
+                f"{quoted:<{quotedWidth}} }},"
+                f"  // scan line {point.scanLine} of {calibration.frameHeight}{emphasis}"
             )
         return "\n".join(lines)
 

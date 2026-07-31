@@ -74,3 +74,11 @@ defaultDistanceFeet = 3.0
 arduinoDir = projectRoot / "arduino"
 sketchName = "rvbhGrid"
 sketchExtension = ".ino"
+
+# Distances drawn with a heavier line, in feet. The overlay is one bit per
+# pixel with no colour available, so line weight is the only way to give the
+# driver a hierarchy. 1 ft is the "about to touch something" line.
+emphasisedDistancesFeet = (1.0,)
+emphasisedThickness = 2
+# Clear space either side of a label where its line is broken for it.
+labelGapPixels = 2
