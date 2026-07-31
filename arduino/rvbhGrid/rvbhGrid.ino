@@ -4,10 +4,10 @@
  * GENERATED FILE - do not edit by hand. Regenerate from the Calibrate tab
  * whenever the calibration changes.
  *
- * Source clip    : rvbh-20260730-100335.avi (frame 3998)
+ * Source clip    : rvbh-20260730-100335.avi (frame 4124)
  * Measured on    : 640 x 480 capture
  * Overlay canvas : 136 x 96
- * Generated      : 2026-07-30 17:54
+ * Generated      : 2026-07-30 19:01
  *
  * HARDWARE
  *   Arduino Uno R3 / Duemilanove (ATmega328P) + Nootropic Design Video
@@ -53,15 +53,33 @@ struct GridLine {
 
 // Measured behind the RV, nearest first.
 const GridLine GRID[] = {
-  {  92, 1,   1,  89,  16, "0 ft"  },  // scan line 461 of 480
-  {  85, 2,   1,  82,  16, "1 ft"  },  // scan line 427 of 480  <- emphasised
-  {  78, 1,   1,  75,  16, "2 ft"  },  // scan line 388 of 480
-  {  63, 1,   1,  60,  16, "4 ft"  },  // scan line 316 of 480
-  {  39, 1,   1,  36,  16, "8 ft"  },  // scan line 193 of 480
-  {  12, 1,   1,   9,  20, "16 ft" },  // scan line 58 of 480
-  {   5, 1,   1,   2,  20, "20 ft" },  // scan line 23 of 480
+  {  92, 1,   1,  89,  16, "0 ft"  },  // scan line 461 of 480, frame 4124
+  {  85, 2,   1,  82,  16, "1 ft"  },  // scan line 427 of 480, frame 3400  <- emphasised
+  {  78, 1,   1,  75,  16, "2 ft"  },  // scan line 388 of 480, frame 3085
+  {  63, 1,   1,  60,  16, "4 ft"  },  // scan line 317 of 480, frame 2581
+  {  39, 1,   1,  36,  16, "8 ft"  },  // scan line 194 of 480, frame 2078
+  {  12, 1,   1,   9,  20, "16 ft" },  // scan line 59 of 480, frame 1322
+  {   5, 1,   1,   2,  20, "20 ft" },  // scan line 24 of 480, frame 0
 };
 const uint8_t GRID_COUNT = sizeof(GRID) / sizeof(GRID[0]);
+
+// Vehicle width where it was measured, top of the canvas first so
+// consecutive entries join downward.
+struct WidthPoint {
+  uint8_t row;
+  uint8_t leftX;
+  uint8_t rightX;
+};
+const WidthPoint WIDTH[] = {
+  {   5,  82,  49 },  // 20 ft
+  {  12,  85,  46 },  // 16 ft
+  {  39,  91,  36 },  // 8 ft
+  {  63,  95,  31 },  // 4 ft
+  {  78,  96,  28 },  // 2 ft
+  {  85,  97,  27 },  // 1 ft
+  {  92,  97,  27 },  // 0 ft
+};
+const uint8_t WIDTH_COUNT = sizeof(WIDTH) / sizeof(WIDTH[0]);
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -75,6 +93,7 @@ void setup() {
   tv.select_font(font4x6);
   tv.fill(0);
   drawGrid();
+  drawWidthLines();
 }
 
 // Visible distress signal on the on-board LED, which the shield leaves free.
@@ -126,6 +145,37 @@ void drawBrokenLine(const GridLine &line) {
     }
     if (gapEnd < W - 1) {
       tv.draw_line(gapEnd, y, W - 1, y, 1);
+    }
+  }
+}
+
+#define DASH_LENGTH 3
+
+// Drawn as a polyline through the measured points rather than as a straight
+// taper. The camera is wide-angle, so the true edges of the vehicle's path
+// curve across the picture and a straight line would lie about where they run.
+void drawWidthLines() {
+  for (uint8_t i = 0; i + 1 < WIDTH_COUNT; i++) {
+    drawDashedEdge(WIDTH[i].leftX, WIDTH[i].row, WIDTH[i + 1].leftX, WIDTH[i + 1].row);
+    drawDashedEdge(WIDTH[i].rightX, WIDTH[i].row, WIDTH[i + 1].rightX, WIDTH[i + 1].row);
+  }
+}
+
+// These run close to vertical, so stepping down the rows and interpolating the
+// column keeps the dashes evenly spaced.
+void drawDashedEdge(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
+  if (y1 <= y0) {
+    return;
+  }
+  int16_t run = (int16_t)y1 - (int16_t)y0;
+  int16_t rise = (int16_t)x1 - (int16_t)x0;
+  for (uint8_t y = y0; y <= y1; y++) {
+    if (((y / DASH_LENGTH) & 1) != 0) {
+      continue;
+    }
+    int16_t x = (int16_t)x0 + rise * (int16_t)(y - y0) / run;
+    if (x >= 0 && x < W) {
+      tv.set_pixel((uint8_t)x, y, 1);
     }
   }
 }

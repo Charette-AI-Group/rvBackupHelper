@@ -1,7 +1,7 @@
 {
   "version": 1,
   "sourceClip": "rvbh-20260730-100335.avi",
-  "frameIndex": 3998,
+  "frameIndex": 4124,
   "frameWidth": 640,
   "frameHeight": 480,
   "overlayCanvasWidth": 136,
@@ -10,37 +10,72 @@
     {
       "distanceFeet": 0.0,
       "scanLine": 461,
-      "overlayRow": 92
+      "frameIndex": 4124,
+      "overlayRow": 92,
+      "leftEdge": 457,
+      "overlayLeft": 97,
+      "rightEdge": 126,
+      "overlayRight": 27
     },
     {
       "distanceFeet": 1.0,
       "scanLine": 427,
-      "overlayRow": 85
+      "frameIndex": 3400,
+      "overlayRow": 85,
+      "leftEdge": 456,
+      "overlayLeft": 97,
+      "rightEdge": 129,
+      "overlayRight": 27
     },
     {
       "distanceFeet": 2.0,
       "scanLine": 388,
-      "overlayRow": 78
+      "frameIndex": 3085,
+      "overlayRow": 78,
+      "leftEdge": 453,
+      "overlayLeft": 96,
+      "rightEdge": 132,
+      "overlayRight": 28
     },
     {
       "distanceFeet": 4.0,
-      "scanLine": 316,
-      "overlayRow": 63
+      "scanLine": 317,
+      "frameIndex": 2581,
+      "overlayRow": 63,
+      "leftEdge": 447,
+      "overlayLeft": 95,
+      "rightEdge": 144,
+      "overlayRight": 31
     },
     {
       "distanceFeet": 8.0,
-      "scanLine": 193,
-      "overlayRow": 39
+      "scanLine": 194,
+      "frameIndex": 2078,
+      "overlayRow": 39,
+      "leftEdge": 428,
+      "overlayLeft": 91,
+      "rightEdge": 169,
+      "overlayRight": 36
     },
     {
       "distanceFeet": 16.0,
-      "scanLine": 58,
-      "overlayRow": 12
+      "scanLine": 59,
+      "frameIndex": 1322,
+      "overlayRow": 12,
+      "leftEdge": 398,
+      "overlayLeft": 85,
+      "rightEdge": 217,
+      "overlayRight": 46
     },
     {
       "distanceFeet": 20.0,
-      "scanLine": 23,
-      "overlayRow": 5
+      "scanLine": 24,
+      "frameIndex": 0,
+      "overlayRow": 5,
+      "leftEdge": 386,
+      "overlayLeft": 82,
+      "rightEdge": 229,
+      "overlayRight": 49
     }
   ]
 }
