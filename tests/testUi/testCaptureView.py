@@ -5,7 +5,12 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, Qt, Signal
 
 from rvBackupHelper.models.captureModels import CameraDevice
-from rvBackupHelper.ui.capture.captureView import CaptureView, startupHint
+from rvBackupHelper.ui.capture.captureView import (
+    CaptureView,
+    gridOffText,
+    gridOnText,
+    startupHint,
+)
 
 
 class FakeScanWorker(QObject):
@@ -161,6 +166,59 @@ def testPressingScanClearsTheHintForGood(qtbot, monkeypatch) -> None:
     # Later placeholder changes must not bring it back.
     view.onDevicesFound([liveDevice])
     assert view.videoDisplay.hintText == ""
+
+
+def testGridToggleSitsWithTheRecordingControls(qtbot) -> None:
+    """It belongs where recording happens, not where measuring happens."""
+    view = CaptureView()
+    qtbot.addWidget(view)
+
+    assert view.gridToggle.isChecked()
+    # Labelled with the state: a checked button is highlighted, and an action
+    # label would then read as though the action were already in effect.
+    assert view.gridToggle.text() == gridOnText
+    # Usable before any device is found: you blank the grid, then record.
+    assert view.gridToggle.isEnabled()
+
+
+def testGridToggleReportsWhatTheBoardActuallySaid(qtbot) -> None:
+    """The button follows the board's reply, not what was assumed."""
+    view = CaptureView()
+    qtbot.addWidget(view)
+    messages: list[str] = []
+    view.statusMessage.connect(messages.append)
+
+    view.onGridReply(False, "grid off")
+
+    assert not view.gridToggle.isChecked()
+    assert view.gridToggle.text() == gridOffText
+    assert "grid off" in messages[-1]
+
+
+def testAFailedGridCommandPutsTheButtonBack(qtbot) -> None:
+    """The board did not do as asked, so the button must not claim it did."""
+    view = CaptureView()
+    qtbot.addWidget(view)
+    messages: list[str] = []
+    view.statusMessage.connect(messages.append)
+    view.gridToggle.setChecked(False)
+
+    view.onGridFailed("No Arduino found.")
+
+    assert view.gridToggle.isChecked()
+    assert view.gridToggle.text() == gridOnText
+    assert "No Arduino found." in messages[-1]
+
+
+def testGridToggleIsIndependentOfCaptureState(qtbot) -> None:
+    """Blanking the overlay must not need a capture running first."""
+    view = CaptureView()
+    qtbot.addWidget(view)
+
+    view.updateControls()
+
+    assert not view.recordButton.isEnabled()
+    assert view.gridToggle.isEnabled()
 
 
 def testSignalLossUpdatesThePreviewPlaceholder(qtbot) -> None:

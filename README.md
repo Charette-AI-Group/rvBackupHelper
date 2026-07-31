@@ -41,7 +41,14 @@ scan opens and closes each device in turn and takes a few seconds; it runs off t
 thread.
 
 Pick the device, press **Start Capture** for a live preview, and **Start Recording** to
-write a clip. Starting capture on a device with no signal is fine: the preview shows
+write a clip.
+
+**Arduino Grid: On / Off** beside the recording controls turns the shield's overlay off, so
+the camera passes through clean. **Record calibration footage with it off** — a grid burned
+into the clip sits right on top of the markings you need to click afterwards. It needs the
+generated grid sketch flashed (the bring-up sketch takes no commands) and takes a couple of
+seconds, because opening a serial port resets the board. The state is kept in the Arduino's
+EEPROM, so it survives that reset, an unplug, and closing the app. Starting capture on a device with no signal is fine: the preview shows
 "Waiting for video signal" and starts as soon as video arrives, which is what an RV camera
 powered only in reverse gear needs.
 
@@ -100,12 +107,7 @@ The panel warns before generating if two distances land on the same OSD row: the
 five times taller than the shield's canvas, so distances a few scan lines apart can collapse
 onto one row that the hardware cannot draw apart.
 
-**Hide Grid on Arduino** blanks the overlay so the camera passes through clean. Record
-calibration footage with it off — a grid burned into the clip sits right on top of the
-markings you are trying to click. It needs the generated grid sketch flashed (the bring-up
-sketch takes no commands) and takes a couple of seconds, because opening a serial port resets
-the board. The wanted state is kept in the Arduino's EEPROM, so it survives that reset, an
-unplug, and closing the app.
+See **Arduino Grid** on the Capture tab for turning the overlay off before recording.
 
 Each line runs the full width of the picture, **breaking around its own label** so the label
 sits in the line rather than floating above it. The overlay is one bit per pixel with no

@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from rvBackupHelper import appConfig
 from rvBackupHelper.models.captureModels import CameraDevice, CaptureSettings
+from rvBackupHelper.services.board.gridWorker import GridWorker
 from rvBackupHelper.services.capture.captureWorker import CaptureWorker
 from rvBackupHelper.services.capture.deviceScanWorker import DeviceScanWorker
 from rvBackupHelper.services.capture.recordingService import buildClipPath
@@ -27,6 +28,10 @@ logger = logging.getLogger(__name__)
 # Shown once on the empty preview so a first-time user knows where to start.
 # Cleared for good the moment Scan Devices is pressed.
 startupHint = "Press Scan Devices to start"
+
+# State, not action: see the comment where the toggle is built.
+gridOnText = "Arduino Grid: On"
+gridOffText = "Arduino Grid: Off"
 
 
 class CaptureView(QWidget):
@@ -40,6 +45,7 @@ class CaptureView(QWidget):
         super().__init__(parent)
         self.captureWorker: CaptureWorker | None = None
         self.scanWorker: DeviceScanWorker | None = None
+        self.gridWorker: GridWorker | None = None
         self.devices: list[CameraDevice] = []
         self.activeDevice: CameraDevice | None = None
         self.recordingPath: Path | None = None
@@ -60,6 +66,22 @@ class CaptureView(QWidget):
         self.recordButton = QPushButton("Start Recording")
         self.recordButton.clicked.connect(self.onRecordClicked)
 
+        # Sits with the recording controls because that is when it matters: a
+        # grid burned into a calibration clip covers the markings you need to
+        # click later.
+        # Labelled with the state, not the action. A checked button is drawn
+        # highlighted, and "Hide Grid" highlighted reads as though hiding were
+        # already in effect - the opposite of what it means.
+        self.gridToggle = QPushButton(gridOnText)
+        self.gridToggle.setCheckable(True)
+        self.gridToggle.setChecked(True)
+        self.gridToggle.setToolTip(
+            "Blanks the overlay so the camera passes through clean. Needs the "
+            "generated grid sketch flashed; takes a moment because opening the "
+            "port resets the board."
+        )
+        self.gridToggle.clicked.connect(self.onGridToggleClicked)
+
         controls = QHBoxLayout()
         controls.addWidget(QLabel("Device:"))
         controls.addWidget(self.deviceCombo)
@@ -67,6 +89,7 @@ class CaptureView(QWidget):
         controls.addStretch()
         controls.addWidget(self.captureButton)
         controls.addWidget(self.recordButton)
+        controls.addWidget(self.gridToggle)
 
         self.videoDisplay = VideoDisplay()
         self.videoDisplay.clear("No video")
@@ -255,6 +278,45 @@ class CaptureView(QWidget):
         self.clipRecorded.emit(path)
         self.statusMessage.emit(f"Saved {path.name} ({frameCount} frames)")
 
+    # -------------------------------------------------------- the board ---
+
+    def onGridToggleClicked(self) -> None:
+        if self.gridWorker is not None:
+            return
+        wanted = self.gridToggle.isChecked()
+        self.gridToggle.setEnabled(False)
+        self.statusMessage.emit(
+            f"Asking the Arduino to {'show' if wanted else 'hide'} the grid..."
+        )
+        worker = GridWorker(wanted, parent=self)
+        worker.finishedWithReply.connect(self.onGridReply)
+        worker.errorOccurred.connect(self.onGridFailed)
+        worker.finished.connect(self.onGridFinished)
+        self.gridWorker = worker
+        worker.start()
+
+    def onGridReply(self, visible: bool, reply: str) -> None:
+        self.gridToggle.setChecked(visible)
+        self.updateGridToggleText()
+        self.statusMessage.emit(f"Arduino says: {reply}")
+
+    def onGridFailed(self, message: str) -> None:
+        # Put the button back where it was: the board did not do as asked.
+        self.gridToggle.setChecked(not self.gridToggle.isChecked())
+        self.updateGridToggleText()
+        self.statusMessage.emit(message)
+
+    def onGridFinished(self) -> None:
+        if self.gridWorker is not None:
+            self.gridWorker.deleteLater()
+            self.gridWorker = None
+        self.gridToggle.setEnabled(True)
+
+    def updateGridToggleText(self) -> None:
+        self.gridToggle.setText(
+            gridOnText if self.gridToggle.isChecked() else gridOffText
+        )
+
     # --------------------------------------------------------- shutdown ---
 
     def shutdown(self) -> None:
@@ -264,3 +326,5 @@ class CaptureView(QWidget):
             self.captureWorker.wait(3000)
         if self.scanWorker is not None:
             self.scanWorker.wait(5000)
+        if self.gridWorker is not None:
+            self.gridWorker.wait(5000)

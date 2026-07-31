@@ -205,47 +205,6 @@ def testSavingNothingIsRefused(view: CalibrationView, monkeypatch) -> None:
     assert "Nothing to save" in messages[-1]
 
 
-def testGridToggleStartsShowingAndFlipsLabel(view: CalibrationView) -> None:
-    assert view.gridToggle.isChecked()
-    assert view.gridToggle.text() == "Hide Grid on Arduino"
-
-    view.gridToggle.setChecked(False)
-    view.updateGridToggleText()
-
-    assert view.gridToggle.text() == "Show Grid on Arduino"
-
-
-def testGridToggleReportsWhatTheBoardActuallySaid(view: CalibrationView) -> None:
-    """The button follows the board's reply, not what was assumed."""
-    messages: list[str] = []
-    view.statusMessage.connect(messages.append)
-
-    view.onGridReply(False, "grid off")
-
-    assert not view.gridToggle.isChecked()
-    assert view.gridToggle.text() == "Show Grid on Arduino"
-    assert "grid off" in messages[-1]
-
-
-def testAFailedGridCommandPutsTheButtonBack(view: CalibrationView) -> None:
-    """The board did not do as asked, so the button must not claim it did."""
-    messages: list[str] = []
-    view.statusMessage.connect(messages.append)
-    view.gridToggle.setChecked(False)
-
-    view.onGridFailed("No Arduino found.")
-
-    assert view.gridToggle.isChecked()
-    assert view.gridToggle.text() == "Hide Grid on Arduino"
-    assert "No Arduino found." in messages[-1]
-
-
-def testGridToggleWorksWithoutAClipOpen(view: CalibrationView) -> None:
-    """Blanking the overlay is what you do before recording, so nothing is open."""
-    assert view.gridToggle.isEnabled()
-    assert view.calibration.isEmpty
-
-
 def testSketchButtonNeedsPoints(view: CalibrationView) -> None:
     assert not view.sketchButton.isEnabled()
 

@@ -34,7 +34,6 @@ from rvBackupHelper.models.calibrationModels import (
     Edge,
 )
 from rvBackupHelper.models.captureModels import ClipInfo
-from rvBackupHelper.services.board.gridWorker import GridWorker
 from rvBackupHelper.services.calibration.calibrationService import (
     CalibrationError,
     CalibrationService,
@@ -76,7 +75,6 @@ class CalibrationView(QWidget):
         self.calibration = Calibration()
         self.calibrationPath: Path | None = None
         self.sketchPath: Path | None = None
-        self.gridWorker: GridWorker | None = None
         self.buildUi()
         self.refresh()
 
@@ -149,25 +147,12 @@ class CalibrationView(QWidget):
         self.sketchButton = QPushButton("Generate Arduino Sketch...")
         self.sketchButton.clicked.connect(self.onGenerateSketchClicked)
 
-        # Record calibration footage with this off: a grid burned into the clip
-        # sits on top of the markings you are trying to click.
-        self.gridToggle = QPushButton("Hide Grid on Arduino")
-        self.gridToggle.setCheckable(True)
-        self.gridToggle.setChecked(True)
-        self.gridToggle.setToolTip(
-            "Blanks the overlay so the camera passes through clean. Needs the "
-            "generated grid sketch flashed; takes a moment because opening the "
-            "port resets the board."
-        )
-        self.gridToggle.clicked.connect(self.onGridToggleClicked)
-
         buttons = QGridLayout()
         buttons.addWidget(self.removeButton, 0, 0)
         buttons.addWidget(self.clearButton, 0, 1)
         buttons.addWidget(self.loadButton, 1, 0)
         buttons.addWidget(self.saveButton, 1, 1)
         buttons.addWidget(self.sketchButton, 2, 0, 1, 2)
-        buttons.addWidget(self.gridToggle, 3, 0, 1, 2)
 
         self.summaryLabel = QLabel()
         self.summaryLabel.setWordWrap(True)
@@ -314,46 +299,6 @@ class CalibrationView(QWidget):
             f"Wrote {len(self.calibration.points)} grid line(s) to {path.name}"
         )
 
-    # ------------------------------------------------------ the board -----
-
-    def onGridToggleClicked(self) -> None:
-        if self.gridWorker is not None:
-            return
-        wanted = self.gridToggle.isChecked()
-        self.gridToggle.setEnabled(False)
-        self.statusMessage.emit(
-            f"Asking the Arduino to {'show' if wanted else 'hide'} the grid..."
-        )
-        worker = GridWorker(wanted, parent=self)
-        worker.finishedWithReply.connect(self.onGridReply)
-        worker.errorOccurred.connect(self.onGridFailed)
-        worker.finished.connect(self.onGridFinished)
-        self.gridWorker = worker
-        worker.start()
-
-    def onGridReply(self, visible: bool, reply: str) -> None:
-        self.gridToggle.setChecked(visible)
-        self.updateGridToggleText()
-        self.statusMessage.emit(f"Arduino says: {reply}")
-
-    def onGridFailed(self, message: str) -> None:
-        # Put the button back where it was: the board did not do as asked.
-        self.gridToggle.setChecked(not self.gridToggle.isChecked())
-        self.updateGridToggleText()
-        self.statusMessage.emit(message)
-
-    def onGridFinished(self) -> None:
-        if self.gridWorker is not None:
-            self.gridWorker.deleteLater()
-            self.gridWorker = None
-        self.gridToggle.setEnabled(True)
-
-    def updateGridToggleText(self) -> None:
-        showing = self.gridToggle.isChecked()
-        self.gridToggle.setText(
-            "Hide Grid on Arduino" if showing else "Show Grid on Arduino"
-        )
-
     def onLoadClicked(self) -> None:
         startDir = self.calibrationPath or defaultCalibrationPath()
         fileName, _ = QFileDialog.getOpenFileName(
@@ -434,6 +379,4 @@ class CalibrationView(QWidget):
     # ----------------------------------------------------------- shutdown --
 
     def shutdown(self) -> None:
-        if self.gridWorker is not None:
-            self.gridWorker.wait(5000)
         self.clipBrowser.shutdown()
