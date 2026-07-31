@@ -7,7 +7,7 @@
  * Source clip    : rvbh-20260730-100335.avi (frame 4124)
  * Measured on    : 640 x 480 capture
  * Overlay canvas : 136 x 96
- * Generated      : 2026-07-30 19:01
+ * Generated      : 2026-07-30 19:37
  *
  * HARDWARE
  *   Arduino Uno R3 / Duemilanove (ATmega328P) + Nootropic Design Video
@@ -34,11 +34,27 @@
 
 #include <TVout.h>
 #include <fontALL.h>
+#include <pollserial.h>
+#include <EEPROM.h>
+#include <avr/pgmspace.h>
 
 #define W 136
 #define H 96
 
+// Single-character commands from the host, so calibration footage can be
+// recorded without the grid burned into it hiding the very markings you are
+// trying to click. 'g' draws, 'c' clears, '?' reports.
+#define COMMAND_BAUD 9600
+#define GRID_STATE_ADDRESS 0
+
 TVout tv;
+// pollserial, not the built-in Serial. HardwareSerial's 64-byte receive and
+// transmit buffers are static, and with the frame buffer taking 1632 of the
+// Uno's 2048 they left about 60 bytes of stack - not enough to run. This one
+// is polled from TVout's blanking hook instead of from an interrupt, so it
+// also stays out of the way of video generation.
+pollserial pserial;
+bool gridVisible = true;
 
 #define LABEL_GAP 2
 
@@ -51,15 +67,25 @@ struct GridLine {
   const char *label;   // distance as shown to the driver
 };
 
+// Labels and tables live in flash, not RAM. The frame buffer takes 1632 of
+// the Uno's 2048 at runtime, so what is left has to stay clear for the stack.
+const char gridLabel0[] PROGMEM = "0 ft";
+const char gridLabel1[] PROGMEM = "1 ft";
+const char gridLabel2[] PROGMEM = "2 ft";
+const char gridLabel3[] PROGMEM = "4 ft";
+const char gridLabel4[] PROGMEM = "8 ft";
+const char gridLabel5[] PROGMEM = "16 ft";
+const char gridLabel6[] PROGMEM = "20 ft";
+
 // Measured behind the RV, nearest first.
-const GridLine GRID[] = {
-  {  92, 1,   1,  89,  16, "0 ft"  },  // scan line 461 of 480, frame 4124
-  {  85, 2,   1,  82,  16, "1 ft"  },  // scan line 427 of 480, frame 3400  <- emphasised
-  {  78, 1,   1,  75,  16, "2 ft"  },  // scan line 388 of 480, frame 3085
-  {  63, 1,   1,  60,  16, "4 ft"  },  // scan line 317 of 480, frame 2581
-  {  39, 1,   1,  36,  16, "8 ft"  },  // scan line 194 of 480, frame 2078
-  {  12, 1,   1,   9,  20, "16 ft" },  // scan line 59 of 480, frame 1322
-  {   5, 1,   1,   2,  20, "20 ft" },  // scan line 24 of 480, frame 0
+const GridLine GRID[] PROGMEM = {
+  {  92, 1,   1,  89,  16, gridLabel0 },  // 0 ft, scan line 461 of 480, frame 4124
+  {  85, 2,   1,  82,  16, gridLabel1 },  // 1 ft, scan line 427 of 480, frame 3400  <- emphasised
+  {  78, 1,   1,  75,  16, gridLabel2 },  // 2 ft, scan line 388 of 480, frame 3085
+  {  63, 1,   1,  60,  16, gridLabel3 },  // 4 ft, scan line 317 of 480, frame 2581
+  {  39, 1,   1,  36,  16, gridLabel4 },  // 8 ft, scan line 194 of 480, frame 2078
+  {  12, 1,   1,   9,  20, gridLabel5 },  // 16 ft, scan line 59 of 480, frame 1322
+  {   5, 1,   1,   2,  20, gridLabel6 },  // 20 ft, scan line 24 of 480, frame 0
 };
 const uint8_t GRID_COUNT = sizeof(GRID) / sizeof(GRID[0]);
 
@@ -70,7 +96,7 @@ struct WidthPoint {
   uint8_t leftX;
   uint8_t rightX;
 };
-const WidthPoint WIDTH[] = {
+const WidthPoint WIDTH[] PROGMEM = {
   {   5,  82,  49 },  // 20 ft
   {  12,  85,  46 },  // 16 ft
   {  39,  91,  36 },  // 8 ft
@@ -91,9 +117,46 @@ void setup() {
   }
   initOverlay();
   tv.select_font(font4x6);
+  // begin() hands back the polling routine; TVout calls it during blanking.
+  tv.set_hbi_hook(pserial.begin(COMMAND_BAUD));
+  // Unwritten EEPROM reads 0xFF, so a board that has never been told otherwise
+  // starts with the grid showing.
+  gridVisible = EEPROM.read(GRID_STATE_ADDRESS) != 0;
+  applyGrid();
+}
+
+// Opening the serial port resets the board, which no host can avoid, so the
+// wanted state is kept in EEPROM and re-applied on every start.
+void handleCommands() {
+  while (pserial.available() > 0) {
+    char command = (char)pserial.read();
+    if (command == 'g') {
+      setGridVisible(true);
+    } else if (command == 'c') {
+      setGridVisible(false);
+    } else if (command == '?') {
+      reportState();
+    }
+  }
+}
+
+void setGridVisible(bool visible) {
+  gridVisible = visible;
+  EEPROM.update(GRID_STATE_ADDRESS, visible ? 1 : 0);
+  applyGrid();
+  reportState();
+}
+
+void applyGrid() {
   tv.fill(0);
-  drawGrid();
-  drawWidthLines();
+  if (gridVisible) {
+    drawGrid();
+    drawWidthLines();
+  }
+}
+
+void reportState() {
+  pserial.println(gridVisible ? "grid on" : "grid off");
 }
 
 // Visible distress signal on the on-board LED, which the shield leaves free.
@@ -122,9 +185,12 @@ ISR(INT0_vect) {
 }
 
 void drawGrid() {
+  GridLine line;
   for (uint8_t i = 0; i < GRID_COUNT; i++) {
-    drawBrokenLine(GRID[i]);
-    tv.print(GRID[i].labelX, GRID[i].labelY, GRID[i].label);
+    // Copy the row out of flash before using it.
+    memcpy_P(&line, &GRID[i], sizeof(line));
+    drawBrokenLine(line);
+    tv.printPGM(line.labelX, line.labelY, line.label);
   }
 }
 
@@ -155,9 +221,12 @@ void drawBrokenLine(const GridLine &line) {
 // taper. The camera is wide-angle, so the true edges of the vehicle's path
 // curve across the picture and a straight line would lie about where they run.
 void drawWidthLines() {
+  WidthPoint near, far;
   for (uint8_t i = 0; i + 1 < WIDTH_COUNT; i++) {
-    drawDashedEdge(WIDTH[i].leftX, WIDTH[i].row, WIDTH[i + 1].leftX, WIDTH[i + 1].row);
-    drawDashedEdge(WIDTH[i].rightX, WIDTH[i].row, WIDTH[i + 1].rightX, WIDTH[i + 1].row);
+    memcpy_P(&near, &WIDTH[i], sizeof(near));
+    memcpy_P(&far, &WIDTH[i + 1], sizeof(far));
+    drawDashedEdge(near.leftX, near.row, far.leftX, far.row);
+    drawDashedEdge(near.rightX, near.row, far.rightX, far.row);
   }
 }
 
@@ -181,6 +250,9 @@ void drawDashedEdge(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
 }
 
 void loop() {
-  // The grid is static: draw once, then idle so the overlay stays put.
-  tv.delay_frame(30);
+  handleCommands();
+  // Nothing is redrawn between commands. Writing to the buffer while the video
+  // generator is scanning it out is what makes the overlay jump, and delay_frame
+  // rather than delay() keeps the wait cooperative with video generation.
+  tv.delay_frame(2);
 }

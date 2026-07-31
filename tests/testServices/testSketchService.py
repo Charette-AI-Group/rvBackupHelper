@@ -39,13 +39,17 @@ def sketch(calibration: Calibration) -> str:
     )
 
 
+# Labels live in flash as named constants, so a GRID row names one rather than
+# carrying the text inline.
+labelDeclaration = re.compile(r'const char (gridLabel\d+)\[\] PROGMEM = "([^"]+)";')
 gridEntry = re.compile(
-    r"\{\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*\"([^\"]+)\"\s*\}"
+    r"\{\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(gridLabel\d+)\s*\}"
 )
 
 
 def gridEntries(sketch: str) -> list[dict]:
-    """Every GRID row as a dict, so tests do not index into a tuple."""
+    """Every GRID row as a dict, with its label text resolved from flash."""
+    labels = dict(labelDeclaration.findall(sketch))
     return [
         {
             "row": int(row),
@@ -53,9 +57,11 @@ def gridEntries(sketch: str) -> list[dict]:
             "labelX": int(labelX),
             "labelY": int(labelY),
             "labelWidth": int(labelWidth),
-            "label": label,
+            "label": labels[symbol],
         }
-        for row, thickness, labelX, labelY, labelWidth, label in gridEntry.findall(sketch)
+        for row, thickness, labelX, labelY, labelWidth, symbol in gridEntry.findall(
+            sketch
+        )
     ]
 
 
@@ -78,8 +84,8 @@ def testGridRowsAreScaledSortedAndLabelled(sketch: str) -> None:
 
 def testEachRowRecordsTheScanLineItCameFrom(sketch: str) -> None:
     """Provenance per line, so a suspect grid can be traced back."""
-    assert "// scan line 430 of 480" in sketch
-    assert "// scan line 372 of 480" in sketch
+    assert "scan line 430 of 480" in sketch
+    assert "scan line 372 of 480" in sketch
 
 
 def testHeaderCarriesTheProvenance(sketch: str) -> None:
@@ -250,7 +256,7 @@ widthEntry = re.compile(r"\{\s*(\d+),\s*(\d+),\s*(\d+)\s*\}")
 
 
 def widthRows(sketch: str) -> list[tuple[int, int, int]]:
-    section = sketch.split("const WidthPoint WIDTH[] = {")[1].split("};")[0]
+    section = sketch.split("const WidthPoint WIDTH[] PROGMEM = {")[1].split("};")[0]
     return [
         (int(row), int(left), int(right))
         for row, left, right in widthEntry.findall(section)

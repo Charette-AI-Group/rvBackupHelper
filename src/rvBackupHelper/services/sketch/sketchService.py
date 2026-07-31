@@ -66,11 +66,27 @@ sketchTemplate = Template(
 
 #include <TVout.h>
 #include <fontALL.h>
+#include <pollserial.h>
+#include <EEPROM.h>
+#include <avr/pgmspace.h>
 
 #define W $canvasWidth
 #define H $canvasHeight
 
+// Single-character commands from the host, so calibration footage can be
+// recorded without the grid burned into it hiding the very markings you are
+// trying to click. '$gridOn' draws, '$gridOff' clears, '$gridQuery' reports.
+#define COMMAND_BAUD $commandBaud
+#define GRID_STATE_ADDRESS $gridStateAddress
+
 TVout tv;
+// pollserial, not the built-in Serial. HardwareSerial's 64-byte receive and
+// transmit buffers are static, and with the frame buffer taking 1632 of the
+// Uno's 2048 they left about 60 bytes of stack - not enough to run. This one
+// is polled from TVout's blanking hook instead of from an interrupt, so it
+// also stays out of the way of video generation.
+pollserial pserial;
+bool gridVisible = true;
 
 #define LABEL_GAP $labelGap
 
@@ -83,8 +99,12 @@ struct GridLine {
   const char *label;   // distance as shown to the driver
 };
 
+// Labels and tables live in flash, not RAM. The frame buffer takes $bufferBytes of
+// the Uno's 2048 at runtime, so what is left has to stay clear for the stack.
+$gridLabels
+
 // Measured behind the RV, nearest first.
-const GridLine GRID[] = {
+const GridLine GRID[] PROGMEM = {
 $gridRows
 };
 const uint8_t GRID_COUNT = sizeof(GRID) / sizeof(GRID[0]);
@@ -101,9 +121,46 @@ void setup() {
   }
   initOverlay();
   tv.select_font(font4x6);
+  // begin() hands back the polling routine; TVout calls it during blanking.
+  tv.set_hbi_hook(pserial.begin(COMMAND_BAUD));
+  // Unwritten EEPROM reads 0xFF, so a board that has never been told otherwise
+  // starts with the grid showing.
+  gridVisible = EEPROM.read(GRID_STATE_ADDRESS) != 0;
+  applyGrid();
+}
+
+// Opening the serial port resets the board, which no host can avoid, so the
+// wanted state is kept in EEPROM and re-applied on every start.
+void handleCommands() {
+  while (pserial.available() > 0) {
+    char command = (char)pserial.read();
+    if (command == '$gridOn') {
+      setGridVisible(true);
+    } else if (command == '$gridOff') {
+      setGridVisible(false);
+    } else if (command == '$gridQuery') {
+      reportState();
+    }
+  }
+}
+
+void setGridVisible(bool visible) {
+  gridVisible = visible;
+  EEPROM.update(GRID_STATE_ADDRESS, visible ? 1 : 0);
+  applyGrid();
+  reportState();
+}
+
+void applyGrid() {
   tv.fill(0);
-  drawGrid();
-  drawWidthLines();
+  if (gridVisible) {
+    drawGrid();
+    drawWidthLines();
+  }
+}
+
+void reportState() {
+  pserial.println(gridVisible ? "grid on" : "grid off");
 }
 
 // Visible distress signal on the on-board LED, which the shield leaves free.
@@ -132,9 +189,12 @@ ISR(INT0_vect) {
 }
 
 void drawGrid() {
+  GridLine line;
   for (uint8_t i = 0; i < GRID_COUNT; i++) {
-    drawBrokenLine(GRID[i]);
-    tv.print(GRID[i].labelX, GRID[i].labelY, GRID[i].label);
+    // Copy the row out of flash before using it.
+    memcpy_P(&line, &GRID[i], sizeof(line));
+    drawBrokenLine(line);
+    tv.printPGM(line.labelX, line.labelY, line.label);
   }
 }
 
@@ -162,8 +222,11 @@ void drawBrokenLine(const GridLine &line) {
 $widthDrawing
 
 void loop() {
-  // The grid is static: draw once, then idle so the overlay stays put.
-  tv.delay_frame(30);
+  handleCommands();
+  // Nothing is redrawn between commands. Writing to the buffer while the video
+  // generator is scanning it out is what makes the overlay jump, and delay_frame
+  // rather than delay() keeps the wait cooperative with video generation.
+  tv.delay_frame(2);
 }
 """
 )
@@ -211,6 +274,12 @@ class SketchService:
             bufferBytes=canvasWidth * canvasHeight // 8,
             generatedAt=stamp,
             labelGap=appConfig.labelGapPixels,
+            commandBaud=appConfig.commandBaud,
+            gridStateAddress=appConfig.gridStateAddress,
+            gridOn=appConfig.gridOnCommand,
+            gridOff=appConfig.gridOffCommand,
+            gridQuery=appConfig.gridQueryCommand,
+            gridLabels=self.renderLabels(calibration),
             gridRows=self.renderRows(calibration),
             widthSection=self.renderWidthSection(calibration),
             widthDrawing=self.renderWidthDrawing(calibration),
@@ -260,7 +329,7 @@ class SketchService:
             "  uint8_t leftX;",
             "  uint8_t rightX;",
             "};",
-            "const WidthPoint WIDTH[] = {",
+            "const WidthPoint WIDTH[] PROGMEM = {",
         ]
         # widthPoints runs near to far; reversed gives ascending rows.
         for point in reversed(points):
@@ -288,9 +357,12 @@ class SketchService:
 // taper. The camera is wide-angle, so the true edges of the vehicle's path
 // curve across the picture and a straight line would lie about where they run.
 void drawWidthLines() {{
+  WidthPoint near, far;
   for (uint8_t i = 0; i + 1 < WIDTH_COUNT; i++) {{
-    drawDashedEdge(WIDTH[i].leftX, WIDTH[i].row, WIDTH[i + 1].leftX, WIDTH[i + 1].row);
-    drawDashedEdge(WIDTH[i].rightX, WIDTH[i].row, WIDTH[i + 1].rightX, WIDTH[i + 1].row);
+    memcpy_P(&near, &WIDTH[i], sizeof(near));
+    memcpy_P(&far, &WIDTH[i + 1], sizeof(far));
+    drawDashedEdge(near.leftX, near.row, far.leftX, far.row);
+    drawDashedEdge(near.rightX, near.row, far.rightX, far.row);
   }}
 }}
 
@@ -320,26 +392,35 @@ void drawDashedEdge(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {{
             return appConfig.emphasisedThickness
         return 1
 
+    def labelSymbol(self, index: int) -> str:
+        return f"gridLabel{index}"
+
+    def renderLabels(self, calibration: Calibration) -> str:
+        return "\n".join(
+            f'const char {self.labelSymbol(index)}[] PROGMEM = "{point.label}";'
+            for index, point in enumerate(calibration.sortedPoints)
+        )
+
     def renderRows(self, calibration: Calibration) -> str:
         points = calibration.sortedPoints
-        # Pad to the longest label so the trailing comments line up; this file
+        # Pad to the longest symbol so the trailing comments line up; this file
         # gets read by a human deciding whether the grid looks right.
-        quotedWidth = max(len(point.label) for point in points) + 2
+        symbolWidth = max(len(self.labelSymbol(i)) for i in range(len(points)))
         placed: list[tuple[int, int, int]] = []
         lines = []
-        for point in points:
+        for index, point in enumerate(points):
             row = calibration.overlayRow(point.scanLine)
             width = glyphWidth * len(point.label)
             labelX, labelY = self.labelPosition(row, point.label, placed)
             placed.append((labelX, labelY, width))
             thickness = self.thicknessFor(point.distanceFeet)
-            quoted = f'"{point.label}"'
             emphasis = "  <- emphasised" if thickness > 1 else ""
+            symbol = self.labelSymbol(index)
             lines.append(
                 f"  {{ {row:3d}, {thickness}, {labelX:3d}, {labelY:3d}, {width:3d}, "
-                f"{quoted:<{quotedWidth}} }},"
-                f"  // scan line {point.scanLine} of {calibration.frameHeight},"
-                f" frame {point.frameIndex}{emphasis}"
+                f"{symbol:<{symbolWidth}} }},"
+                f"  // {point.label}, scan line {point.scanLine}"
+                f" of {calibration.frameHeight}, frame {point.frameIndex}{emphasis}"
             )
         return "\n".join(lines)
 

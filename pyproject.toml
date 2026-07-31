@@ -11,6 +11,8 @@ dependencies = [
     # including ones it cannot open itself, so a grabber with no signal still
     # gets its real name.
     "pygrabber>=0.2; sys_platform == 'win32'",
+    # Talking to the Arduino, to blank the overlay while recording calibration.
+    "pyserial>=3.5,<4",
 ]
 
 [project.optional-dependencies]

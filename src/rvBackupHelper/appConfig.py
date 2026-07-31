@@ -85,3 +85,21 @@ labelGapPixels = 2
 # Dash on/off run for the vehicle-width edges, in canvas pixels. Dashes keep
 # them reading as a corridor rather than as more distance lines.
 dashLengthPixels = 3
+
+# --- Talking to the board ------------------------------------------------
+
+# The sketch listens for single-character commands so the overlay can be
+# blanked while recording calibration footage; a burned-in grid hides the very
+# markings you are trying to click.
+commandBaud = 9600
+gridOnCommand = "g"
+gridOffCommand = "c"
+gridQueryCommand = "?"
+# Opening a serial port resets the Uno, so the wanted state lives in EEPROM and
+# survives the reset the host cannot avoid causing.
+gridStateAddress = 0
+# The bootloader runs before the sketch starts listening.
+boardResetSeconds = 2.0
+serialTimeoutSeconds = 2.0
+# USB vendor ids: Arduino LLC, and the CH340 most clones use.
+boardVendorIds = (0x2341, 0x2A03, 0x1A86)

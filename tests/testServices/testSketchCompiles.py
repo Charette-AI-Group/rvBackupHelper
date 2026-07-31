@@ -7,6 +7,7 @@ the suite still runs on a machine without the toolchain.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -18,7 +19,25 @@ from rvBackupHelper.services.sketch.sketchService import SketchService
 
 fqbn = "arduino:avr:uno"
 installedCliPath = Path(r"C:\Program Files\Arduino CLI\arduino-cli.exe")
-requiredLibraries = ("TVout", "TVoutfonts")
+requiredLibraries = ("TVout", "TVoutfonts", "pollserial")
+
+unoSram = 2048
+# Both of these are malloc'd at runtime, so the compiler's "global variables"
+# figure excludes them and a clean build looks far roomier than it is. Adding
+# HardwareSerial once left about 60 bytes of stack, which is not enough to run;
+# this is the guard against that recurring as more calibration points are added.
+frameBufferBytes = 136 // 8 * 96
+pollserialBufferBytes = 64
+heapBytes = frameBufferBytes + pollserialBufferBytes
+minimumStackBytes = 200
+
+globalsReported = re.compile(r"Global variables use (\d+) bytes")
+
+
+def freeStackBytes(compilerOutput: str) -> int:
+    match = globalsReported.search(compilerOutput)
+    assert match, f"could not read RAM use from:\n{compilerOutput}"
+    return unoSram - int(match.group(1)) - heapBytes
 
 
 def findArduinoCli() -> str | None:
@@ -106,3 +125,10 @@ def testSketchWithVehicleWidthCompiles(tmp_path: Path) -> None:
         f"width sketch did not compile:\n{result.stdout}\n{result.stderr}"
     )
     assert "Sketch uses" in result.stdout
+
+    # The fullest sketch is the one most likely to run the Uno out of memory.
+    free = freeStackBytes(result.stdout)
+    assert free >= minimumStackBytes, (
+        f"only {free} bytes left for the stack once the {heapBytes} bytes of "
+        f"runtime allocations are taken; needs at least {minimumStackBytes}"
+    )
