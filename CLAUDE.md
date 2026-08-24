@@ -130,25 +130,61 @@ Two things that bit during implementation and are pinned by tests:
 - **`ClipBrowser.showFrame()` goes through the slider**, otherwise the transport controls end
   up contradicting the position label.
 
-## Where the project stands (2026-07-30)
+## Where the project stands (2026-08-24)
 
-The whole chain works end to end with real measurements: RV camera → recorded clip →
-distance and width calibration → JSON → generated sketch → flashed Arduino → grid and
-dashed width corridor on the display, all confirmed by capture.
+The whole chain works end to end and is documented: RV camera to recorded clip, distance and
+width calibration, JSON, generated sketch, flashed Arduino, grid and dashed corridor on the
+display. All of it is driven from the app - **the Arduino IDE is not needed**, uploading goes
+through arduino-cli.
 
-**Open item, being worked on: the RV footage is washed out.** This is almost certainly not
-sun on concrete. Measured on frame 2265 of `rvbh-20260730-100335.avi`: mean 211, **1st
-percentile 116**, 99th percentile 254. Blacks sitting at 116 rather than near zero means the
-whole signal is lifted and compressed, which is a *level* problem, not exposure — an
-auto-exposure camera would still produce near-black blacks. The classic cause is a missing or
-doubled **75 ohm termination** somewhere in the path, which roughly doubles amplitude.
+**The camera wiring fault is fixed.** The July footage clipped 3.1% of its pixels at white;
+the August footage clips 0.00%. Judge this by *clipping*, not by the black floor - a sunlit
+asphalt driveway genuinely contains no black, and `tools/measureVideoLevels.py` was itself
+corrected on that point.
 
-Cheapest test: feed the camera straight into the USB grabber, bypassing the shield entirely.
-If that picture is clean, the shield or its cabling is lifting the level; if it is still
-washed out, the fault is upstream in the RV wiring, which was installed over a year ago.
+**Open item: the August calibration was measured on 640x360 footage.** That was an accident -
+OBS was used instead of the app's own Capture tab, and it fits a 4:3 composite source onto a
+16:9 canvas. It matters because the shield overlays the *full* frame, so a mapping measured on
+a cropped capture will not line up on the vehicle. A re-recording at 640x480 was planned; use
+the app's Capture tab and this cannot happen.
 
-A second calibration is planned once that is fixed — the pole markings were too hard to see
-to trust the far distances.
+Calibration files carry a date prefix: `calibration/260730rvbhCalibration.json` (7 points,
+640x480, correct geometry, washed-out footage) and `260819rvbhCalibration.json` (9 points out
+to 24 ft, 640x360, clean footage, wrong geometry). Sketches match: `arduino/rvbhGridV1/` and
+`arduino/rvbhGridV2/`.
+
+**Not yet done:** nothing has been flashed and driven in the vehicle with the grid live, and
+the overlay figure in the manual is a rendering rather than a photograph because no hardware
+was connected when it was written.
+
+## What the app does now
+
+Two tabs. A separate Review tab was removed as redundant - Calibrate embeds the same
+`ClipBrowser`.
+
+- **Capture** - device scan by Windows name, live preview, recording, and **Arduino Grid:
+  On/Off**, which blanks the shield's overlay over serial so calibration footage is clean.
+- **Calibrate** - clip browser plus a measurement panel: distance lines, left/right width
+  edges, a points table, Save/Load JSON, **Generate Arduino Sketch...** and **Upload to
+  Arduino**. Upload remembers the last sketch generated, across restarts.
+- **Help** - **User Manual...** (F1) and **About** with a Donate button matching pySPWB.
+
+Roughly 223 tests. Two of them touch real hardware paths and skip cleanly without it: the
+sketch compile test needs arduino-cli, and it also asserts at least 200 bytes of stack remain.
+
+## The manual
+
+`docs/manual/` - index plus four pages (hardware setup, capturing footage, calibrating, sketch
+and upload) with screenshots in `images/`. Modelled on the pySPWB manuals.
+
+Screenshots are produced by driving the app against the real calibration and its source clip,
+not mocked. If the UI changes, regenerate them rather than letting them drift.
+
+**Help > User Manual** prefers the published copy on GitHub - the repo is public now, and
+GitHub draws the screenshots inline where a local `.md` opens in a text editor. It checks
+reachability with a HEAD request on a worker thread first, because `openUrl` reports that a
+browser launched, not that the page loaded. With no network it opens `appConfig.manualPath`,
+which is derived at import from where the package sits and so follows any checkout.
 
 ## The Uno is out of RAM, and the compiler hides it
 
@@ -267,25 +303,26 @@ whose sync *amplitude* is wandering — R4 sets the LM1881 slicing threshold, so
 level means a moving ideal threshold and you chase it forever. The slow cycling also fits a
 beat between the wobbling field rate and TVout's internal timing.
 
-**Testable prediction:** against a crystal-locked camera, one R4 setting should hold instead
-of needing to be chased. If it still wanders with the RV camera, the cause is on the shield
-and this analysis is wrong.
+**Resolved — it was the bench source.** The prediction was that a crystal-locked camera would
+hold one R4 setting instead of needing to be chased. Confirmed in the vehicle: "the jitter is
+totally gone while using a real camera signal in the RV." The test footage is VHS-grade and
+VHS timebase error is exactly this symptom.
 
-**Most likely dominant cause: the bench source.** The test footage is VHS-grade, and VHS
-timebase error is exactly this symptom. Two things would settle it, both physical:
-
-1. **Turn R4 up slightly** — the nootropic build notes name this as the fix for vertical
-   jumpiness, and it is the one lever nobody has touched yet. Measure, turn, measure again.
-2. **Run stage A with no video source at all** (`USE_OVERLAY 0`, SYNC SELECT on pin 9, OUTPUT
-   SELECT on Sync only). The Arduino then generates its own sync. If the jitter vanishes, the
-   source was responsible and the RV camera — crystal-locked, unlike a tape — should be far
-   steadier.
+So **do not chase jitter on the bench**, and do not let a bench measurement drive a firmware
+change. If it ever reappears against the RV camera, the analysis above is wrong and the cause
+is on the shield; the first physical lever is still to turn R4 up slightly, which the nootropic
+build notes name as the fix for vertical jumpiness.
 
 ## Repo layout beyond the template
 
-- `src/rvBackupHelper/` — the PySide6 app (capture, review, calibration UI). Standard template layout.
-- `arduino/` — Arduino sketches. Not a Python package; lives beside `src/`.
-- `calibration/` — measured scanline-to-distance data.
+- `src/rvBackupHelper/` — the PySide6 app (capture and calibration UI). Standard template layout.
+- `arduino/` — Arduino sketches, one folder per sketch as the Arduino tools require:
+  `rvbhBringUp/` (hardware proving, takes no commands), `rvbhGridV1/`, `rvbhGridV2/`.
+- `calibration/` — measured scanline-to-distance data, date-prefixed.
+- `docs/manual/` — the user manual, markdown plus `images/`. Reachable from Help > User Manual.
+- `tools/` — measurement scripts that answer questions the app cannot: `measureOverlayJitter.py`
+  and `measureVideoLevels.py`. Judge footage by its clipping percentage, not its black floor.
+- `recordings/` — git-ignored; video must never reach GitHub.
 
 ## Workflow
 
@@ -297,9 +334,11 @@ recorded through the USB grabber. Testing only in "Sync only" mode proves the Ar
 not that the overlay survives a real signal. An HDMI-to-composite converter (~$12) turns existing
 recordings into a real composite source, so calibration can be rehearsed at the desk.
 
-**Before leaving the office**, the laptop needs: Python 3.14+, the Arduino IDE, the TVout-VE
-library, and the **CH340 USB driver** (most clone Unos need it). Claude Code needs internet —
-if the RV is parked without signal, plan on phone tethering.
+**Before leaving the office**, the laptop needs: Python 3.14+, **arduino-cli** with the
+`arduino:avr` core, the TVout-VE library, and the **CH340 USB driver** (most clone Unos need
+it). The Arduino IDE is optional now — the app compiles and flashes through arduino-cli, so
+the IDE is only for editing a sketch by hand. Claude Code needs internet — if the RV is parked
+without signal, plan on phone tethering.
 
 ## Predecessor
 
