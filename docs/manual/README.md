@@ -56,14 +56,20 @@ microcontroller cannot generate while it is also locking to the camera.
 
 ## Reaching this manual from the application
 
-**Help → User Manual…**, or **F1**, opens these pages. It prefers the copy in
-your own checkout — no network, no GitHub sign-in — and falls back to the
-rendered copy on GitHub for an install that carries no docs, or if nothing on
-the system is willing to open a `.md` file.
+**Help → User Manual…**, or **F1**, opens these pages. It prefers the published
+copy on GitHub, because GitHub renders the markdown and draws the screenshots
+inline; a local `.md` opens in whatever editor claims the extension and shows
+the screenshots as link text.
 
-A markdown viewer is worth having for the local copy; without one the file
-opens in whatever editor is associated with `.md`, and the screenshots will not
-be drawn inline.
+Before opening it, the application checks that the page actually answers — a
+`HEAD` request with a short timeout, run off the interface thread so the window
+never freezes waiting for it. Launching a browser succeeds even with no network,
+so without that check an offline machine would be handed an error page instead
+of the copy sitting on its own disk.
+
+**With no connection it opens the copy in your checkout instead.** That path is
+worked out at run time from where the package is installed, so it follows the
+checkout on any machine rather than being written down anywhere.
 
 ## Help, and supporting the work
 

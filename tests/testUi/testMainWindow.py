@@ -160,41 +160,35 @@ def openedUrls(monkeypatch) -> list[str]:
     return opened
 
 
-def testManualPrefersTheCopyInTheCheckout(qtbot, monkeypatch, tmp_path) -> None:
-    """No network and no GitHub login needed, which matters: the repo is private."""
-    local = tmp_path / "README.md"
-    local.write_text("# manual", encoding="utf-8")
-    monkeypatch.setattr(appConfig, "manualPath", local)
+def testPublishedManualIsPreferredWhenReachable(qtbot, monkeypatch) -> None:
+    """GitHub renders the screenshots; a local .md in an editor does not."""
     mainWindow = MainWindow()
     qtbot.addWidget(mainWindow)
     opened = openedUrls(monkeypatch)
 
-    mainWindow.manualAction.trigger()
+    mainWindow.openManual(publishedIsReachable=True)
+
+    assert opened == [appConfig.manualUrl]
+    assert "opening in your browser" in mainWindow.statusBar().currentMessage()
+
+
+def testTheLocalCopyIsUsedWhenThereIsNoConnection(qtbot, monkeypatch) -> None:
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    opened = openedUrls(monkeypatch)
+
+    mainWindow.openManual(publishedIsReachable=False)
 
     assert len(opened) == 1
     assert opened[0].startswith("file:")
     assert opened[0].endswith("README.md")
-    assert str(local) in mainWindow.statusBar().currentMessage()
+    assert "No connection" in mainWindow.statusBar().currentMessage()
 
 
-def testManualFallsBackOnlineWhenThereIsNoCheckout(
+def testAnUnreachableSiteFallsThroughToTheLocalCopy(
     qtbot, monkeypatch, tmp_path
 ) -> None:
-    monkeypatch.setattr(appConfig, "manualPath", tmp_path / "absent" / "README.md")
-    mainWindow = MainWindow()
-    qtbot.addWidget(mainWindow)
-    opened = openedUrls(monkeypatch)
-
-    mainWindow.manualAction.trigger()
-
-    assert opened == [appConfig.manualUrl]
-    assert "manual is opening" in mainWindow.statusBar().currentMessage()
-
-
-def testManualFallsBackOnlineWhenNothingOpensMarkdown(
-    qtbot, monkeypatch, tmp_path
-) -> None:
-    """A .md with no file association fails to open; the web copy still works."""
+    """Reported reachable, but the browser still refused to launch."""
     local = tmp_path / "README.md"
     local.write_text("# manual", encoding="utf-8")
     monkeypatch.setattr(appConfig, "manualPath", local)
@@ -204,18 +198,17 @@ def testManualFallsBackOnlineWhenNothingOpensMarkdown(
 
     def openUrl(url):
         attempted.append(url.toString())
-        return not url.isLocalFile()
+        return url.isLocalFile()
 
     monkeypatch.setattr(
         "rvBackupHelper.ui.mainWindow.QDesktopServices.openUrl", openUrl
     )
 
-    mainWindow.manualAction.trigger()
+    mainWindow.openManual(publishedIsReachable=True)
 
     assert len(attempted) == 2
-    assert attempted[0].startswith("file:")
-    assert attempted[1] == appConfig.manualUrl
-    assert "manual is opening" in mainWindow.statusBar().currentMessage()
+    assert attempted[0] == appConfig.manualUrl
+    assert attempted[1].startswith("file:")
 
 
 def testManualShowsBothAddressesWhenNothingOpens(qtbot, monkeypatch) -> None:
@@ -231,10 +224,27 @@ def testManualShowsBothAddressesWhenNothingOpens(qtbot, monkeypatch) -> None:
         lambda parent, title, text: shown.append(text),
     )
 
-    mainWindow.onHelpManual()
+    mainWindow.openManual(publishedIsReachable=False)
 
-    assert str(appConfig.manualPath) in shown[0]
     assert appConfig.manualUrl in shown[0]
+    assert str(appConfig.manualPath) in shown[0]
+
+
+def testTheCheckRunsOffTheInterfaceThread(qtbot, monkeypatch) -> None:
+    """A network probe can hang until its timeout; the window must not."""
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    openedUrls(monkeypatch)
+
+    with qtbot.waitSignal(mainWindow.manualAction.changed, timeout=5000):
+        mainWindow.onHelpManual()
+    # Disabled while the probe is in flight, so it cannot be started twice.
+    assert not mainWindow.manualAction.isEnabled()
+
+    assert mainWindow.manualWorker is not None
+    mainWindow.manualWorker.wait(5000)
+    qtbot.waitUntil(lambda: mainWindow.manualWorker is None, timeout=5000)
+    assert mainWindow.manualAction.isEnabled()
 
 
 def testManualHasTheStandardHelpShortcut(qtbot) -> None:

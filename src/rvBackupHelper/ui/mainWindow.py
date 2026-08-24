@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from rvBackupHelper import appConfig
+from rvBackupHelper.services.manual.manualWorker import ManualWorker
 from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.ui.calibration.calibrationView import CalibrationView
 from rvBackupHelper.ui.capture.captureView import CaptureView
@@ -36,6 +37,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(appConfig.windowTitle)
         self.resize(appConfig.defaultWindowWidth, appConfig.defaultWindowHeight)
         self.settingsService = settingsService or SettingsService()
+        self.manualWorker: ManualWorker | None = None
 
         self.captureView = CaptureView()
         # Calibrate embeds the same clip browser a separate Review tab would
@@ -138,36 +140,57 @@ class MainWindow(QMainWindow):
         self.calibrationView.openClip(path)
 
     def onHelpManual(self) -> None:
-        """Open the manual, preferring the copy in this checkout.
+        """Open the manual, preferring the published copy.
 
-        A checkout has the screenshots sitting beside the markdown and needs
-        neither the network nor a GitHub login - which matters, because the
-        repository is private. The rendered copy on GitHub is the fallback for
-        an install that carries no docs, and for the case where the system has
-        nothing willing to open a .md file.
+        GitHub renders the markdown and its screenshots; a local .md opens in
+        whatever editor claims the extension and shows the screenshots as link
+        text. So the published copy wins when it is reachable - but openUrl
+        only reports that a browser launched, not that the page loaded, so
+        whether it is reachable has to be asked separately, off this thread.
         """
+        if self.manualWorker is not None:
+            return
+        self.manualAction.setEnabled(False)
+        self.showStatus("Looking for the manual...")
+        worker = ManualWorker(parent=self)
+        worker.resolved.connect(self.openManual)
+        worker.finished.connect(self.onManualCheckFinished)
+        self.manualWorker = worker
+        worker.start()
+
+    def openManual(self, publishedIsReachable: bool) -> None:
+        if publishedIsReachable and QDesktopServices.openUrl(
+            QUrl(appConfig.manualUrl)
+        ):
+            self.showStatus("The manual is opening in your browser.")
+            return
         local = appConfig.manualPath
         if local.exists() and QDesktopServices.openUrl(
             QUrl.fromLocalFile(str(local))
         ):
-            self.showStatus(f"Opening {local}")
-            return
-        if QDesktopServices.openUrl(QUrl(appConfig.manualUrl)):
-            self.showStatus("The manual is opening in your browser.")
+            self.showStatus(f"No connection - opening the local copy, {local}")
             return
         # Leaving the user with nothing is worse than making them copy a URL.
         QMessageBox.information(
             self,
             "User Manual",
             "Could not open the manual. It is at:\n\n"
-            f"{local}\n\n{appConfig.manualUrl}",
+            f"{appConfig.manualUrl}\n\n{local}",
         )
+
+    def onManualCheckFinished(self) -> None:
+        if self.manualWorker is not None:
+            self.manualWorker.deleteLater()
+            self.manualWorker = None
+        self.manualAction.setEnabled(True)
 
     def onHelpAbout(self) -> None:
         if showAbout(self):
             self.showStatus("Thank you - the donation page is opening in your browser.")
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        if self.manualWorker is not None:
+            self.manualWorker.wait(int(appConfig.manualTimeoutSeconds * 1000) + 1000)
         self.captureView.shutdown()
         self.calibrationView.shutdown()
         super().closeEvent(event)

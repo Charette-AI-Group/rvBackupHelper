@@ -13,10 +13,12 @@ editorName = "Francois Charette, PhD"
 aiAgentName = "Claude - Opus 5"
 copyrightHolder = "Charette AI Group, LLC"
 repoUrl = "https://github.com/Charette-AI-Group/rvBackupHelper"
-# The manual is opened from the checkout when there is one - it needs no
-# network and no GitHub login, which matters because the repository is
-# private. The rendered copy is the fallback for an install with no docs.
+# The published manual is preferred: GitHub renders the markdown and its
+# screenshots, which a local .md in a text editor does not. The copy in a
+# checkout is the fallback for when there is no network.
 manualUrl = f"{repoUrl}/blob/main/docs/manual/README.md"
+# How long to wait for the published copy before giving up and going local.
+manualTimeoutSeconds = 3.0
 
 # Donate button, matching the sibling Charette AI Group applications so they
 # look like they come from the same place.
