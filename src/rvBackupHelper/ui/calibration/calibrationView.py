@@ -34,6 +34,7 @@ from rvBackupHelper.models.calibrationModels import (
     Edge,
 )
 from rvBackupHelper.models.captureModels import ClipInfo
+from rvBackupHelper.services.board.uploadWorker import UploadWorker
 from rvBackupHelper.services.calibration.calibrationService import (
     CalibrationError,
     CalibrationService,
@@ -43,6 +44,7 @@ from rvBackupHelper.services.sketch.sketchService import (
     SketchError,
     SketchService,
     defaultSketchPath,
+    sketchFolderPath,
 )
 from rvBackupHelper.ui.widgets.clipBrowser import ClipBrowser
 
@@ -75,6 +77,7 @@ class CalibrationView(QWidget):
         self.calibration = Calibration()
         self.calibrationPath: Path | None = None
         self.sketchPath: Path | None = None
+        self.uploadWorker: UploadWorker | None = None
         self.buildUi()
         self.refresh()
 
@@ -155,12 +158,22 @@ class CalibrationView(QWidget):
         self.sketchButton = QPushButton("Generate Arduino Sketch...")
         self.sketchButton.clicked.connect(self.onGenerateSketchClicked)
 
+        # arduino-cli does exactly what the IDE's upload button does, so the
+        # IDE is only needed for editing a sketch by hand.
+        self.uploadButton = QPushButton("Upload to Arduino")
+        self.uploadButton.setToolTip(
+            "Compiles and flashes the generated sketch with arduino-cli. Takes "
+            "a few seconds; the Arduino IDE is not needed."
+        )
+        self.uploadButton.clicked.connect(self.onUploadClicked)
+
         buttons = QGridLayout()
         buttons.addWidget(self.removeButton, 0, 0)
         buttons.addWidget(self.clearButton, 0, 1)
         buttons.addWidget(self.loadButton, 1, 0)
         buttons.addWidget(self.saveButton, 1, 1)
         buttons.addWidget(self.sketchButton, 2, 0, 1, 2)
+        buttons.addWidget(self.uploadButton, 3, 0, 1, 2)
 
         self.summaryLabel = QLabel()
         self.summaryLabel.setWordWrap(True)
@@ -295,7 +308,11 @@ class CalibrationView(QWidget):
         )
         if not fileName:
             return
-        path = Path(fileName)
+        chosen = Path(fileName)
+        # The Arduino tools need the .ino inside a folder of the same name, so
+        # a name that does not match gets its own folder rather than a sketch
+        # nothing will build.
+        path = sketchFolderPath(chosen)
         try:
             self.sketchService.save(self.calibration, path)
         except (SketchError, OSError) as exc:
@@ -303,9 +320,43 @@ class CalibrationView(QWidget):
             self.statusMessage.emit(f"Could not generate sketch: {exc}")
             return
         self.sketchPath = path
+        moved = "" if path == chosen else f" (in {path.parent.name}/, as Arduino requires)"
         self.statusMessage.emit(
-            f"Wrote {len(self.calibration.points)} grid line(s) to {path.name}"
+            f"Wrote {len(self.calibration.points)} grid line(s) to {path.name}{moved}"
         )
+        self.updateControls()
+
+    # ------------------------------------------------------------ upload --
+
+    def uploadTarget(self) -> Path:
+        """The sketch to flash: the one just generated, else the default."""
+        return self.sketchPath or defaultSketchPath()
+
+    def onUploadClicked(self) -> None:
+        if self.uploadWorker is not None:
+            return
+        target = self.uploadTarget()
+        self.uploadButton.setEnabled(False)
+        self.statusMessage.emit(f"Compiling and uploading {target.parent.name}...")
+        worker = UploadWorker(target, parent=self)
+        worker.finishedWithSummary.connect(self.onUploadFinished)
+        worker.errorOccurred.connect(self.onUploadFailed)
+        worker.finished.connect(self.onUploadDone)
+        self.uploadWorker = worker
+        worker.start()
+
+    def onUploadFinished(self, summary: str) -> None:
+        self.statusMessage.emit(summary)
+
+    def onUploadFailed(self, message: str) -> None:
+        # Keep it on one line: the status bar cannot show a compiler trace.
+        self.statusMessage.emit(message.replace("\n", " | "))
+
+    def onUploadDone(self) -> None:
+        if self.uploadWorker is not None:
+            self.uploadWorker.deleteLater()
+            self.uploadWorker = None
+        self.updateControls()
 
     def onLoadClicked(self) -> None:
         startDir = self.calibrationPath or defaultCalibrationPath()
@@ -383,8 +434,15 @@ class CalibrationView(QWidget):
         self.clearButton.setEnabled(hasPoints)
         self.saveButton.setEnabled(hasPoints)
         self.sketchButton.setEnabled(hasPoints)
+        # Uploading needs a generated sketch on disk, not merely points in
+        # memory: it flashes what was written, not what is on screen.
+        self.uploadButton.setEnabled(
+            self.uploadWorker is None and self.uploadTarget().exists()
+        )
 
     # ----------------------------------------------------------- shutdown --
 
     def shutdown(self) -> None:
+        if self.uploadWorker is not None:
+            self.uploadWorker.wait(int(appConfig.uploadTimeoutSeconds * 1000))
         self.clipBrowser.shutdown()

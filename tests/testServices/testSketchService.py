@@ -14,6 +14,7 @@ from rvBackupHelper.services.sketch.sketchService import (
     SketchError,
     SketchService,
     defaultSketchPath,
+    sketchFolderPath,
 )
 
 
@@ -387,3 +388,24 @@ def testDefaultPathPutsTheSketchInItsOwnFolder() -> None:
 
     assert path.suffix == ".ino"
     assert path.stem == path.parent.name
+
+
+def testSketchKeepsItsPathWhenTheFolderAlreadyMatches(tmp_path: Path) -> None:
+    chosen = tmp_path / "rvbhGrid" / "rvbhGrid.ino"
+
+    assert sketchFolderPath(chosen) == chosen
+
+
+def testAMismatchedSketchNameGetsItsOwnFolder(tmp_path: Path) -> None:
+    """Saving rvbhGridV2.ino into a rvbhGrid folder builds nothing.
+
+    Worse, a second .ino beside an existing one is treated as another tab of
+    the same sketch and collides with it.
+    """
+    chosen = tmp_path / "rvbhGrid" / "rvbhGridV2.ino"
+
+    assert sketchFolderPath(chosen) == tmp_path / "rvbhGrid" / "rvbhGridV2" / "rvbhGridV2.ino"
+
+
+def testTheDefaultPathIsAlreadyWellFormed() -> None:
+    assert sketchFolderPath(defaultSketchPath()) == defaultSketchPath()

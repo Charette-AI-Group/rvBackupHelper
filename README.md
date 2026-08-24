@@ -107,6 +107,17 @@ The panel warns before generating if two distances land on the same OSD row: the
 five times taller than the shield's canvas, so distances a few scan lines apart can collapse
 onto one row that the hardware cannot draw apart.
 
+Sketches are written into a folder of their own name, because the Arduino tools require that
+and a second `.ino` sitting beside an existing one is treated as another tab of the same
+sketch, which then fails to build. Naming a sketch something other than its folder gets it
+its own folder automatically.
+
+**Upload to Arduino** compiles and flashes it with `arduino-cli`, which is exactly what the
+IDE's upload button does — **the Arduino IDE is only needed if you want to edit a sketch by
+hand.** It takes a few seconds and reports the board's own size summary when it finishes. It
+needs `arduino-cli` installed (see below); without it the button says so and points you at
+the IDE.
+
 See **Arduino Grid** on the Capture tab for turning the overlay off before recording.
 
 Each line runs the full width of the picture, **breaking around its own label** so the label

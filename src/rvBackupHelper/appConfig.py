@@ -103,3 +103,11 @@ boardResetSeconds = 2.0
 serialTimeoutSeconds = 2.0
 # USB vendor ids: Arduino LLC, and the CH340 most clones use.
 boardVendorIds = (0x2341, 0x2A03, 0x1A86)
+
+# Uploading sketches without the Arduino IDE. arduino-cli is looked up on PATH
+# first; this is where winget puts it when it is not.
+arduinoCliPath = r"C:\Program Files\Arduino CLI\arduino-cli.exe"
+boardFqbn = "arduino:avr:uno"
+# A cold compile pulls the whole core through; uploading adds a reset and a
+# verify pass.
+uploadTimeoutSeconds = 300.0

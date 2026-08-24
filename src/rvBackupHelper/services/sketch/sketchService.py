@@ -28,6 +28,20 @@ def defaultSketchPath() -> Path:
     return folder / f"{appConfig.sketchName}{appConfig.sketchExtension}"
 
 
+def sketchFolderPath(chosen: Path) -> Path:
+    """Put a chosen filename into a folder of its own name.
+
+    The Arduino tools require a sketch to live in a folder carrying the same
+    name. Saving "rvbhGridV2.ino" straight into an existing "rvbhGrid" folder
+    produces something neither arduino-cli nor the IDE will build, and worse,
+    a second .ino beside an existing one is treated as another tab of the same
+    sketch and collides with it.
+    """
+    if chosen.stem == chosen.parent.name:
+        return chosen
+    return chosen.parent / chosen.stem / chosen.name
+
+
 # $-placeholders, so the C braces below need no escaping.
 sketchTemplate = Template(
     """/*
