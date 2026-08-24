@@ -27,6 +27,13 @@ python -m rvBackupHelper.main
 
 Or just double-click **`runApp.cmd`** in the project folder (needs the one-time setup done first).
 
+## User manual
+
+A step-by-step walkthrough with screenshots lives in
+[`docs/manual/`](docs/manual/README.md): the hardware rig, recording behind the
+RV, calibrating, and generating and flashing the sketch. The notes below are the
+quick reference.
+
 ## Using the app
 
 > **Close OBS first.** Only one application can hold a capture device at a time. If OBS (or
