@@ -54,6 +54,12 @@ It is monochrome white, and that is a hardware limit rather than a choice: the
 overlay is one bit per pixel, and NTSC colour would need a subcarrier the
 microcontroller cannot generate while it is also locking to the camera.
 
+## Reaching this manual from the application
+
+**Help → User Manual…**, or **F1**, opens these pages in a browser. It opens the
+copy on GitHub rather than the files in a checkout, because GitHub renders the
+markdown and its screenshots while a local `.md` would open in a text editor.
+
 ## Help, and supporting the work
 
 **Help → About** carries the version, the credits and a Donate button. The

@@ -13,6 +13,9 @@ editorName = "Francois Charette, PhD"
 aiAgentName = "Claude - Opus 5"
 copyrightHolder = "Charette AI Group, LLC"
 repoUrl = "https://github.com/Charette-AI-Group/rvBackupHelper"
+# The rendered copy, not the local file: GitHub draws the markdown and its
+# screenshots, while a checkout's .md opens in a text editor.
+manualUrl = f"{repoUrl}/blob/main/docs/manual/README.md"
 
 # Donate button, matching the sibling Charette AI Group applications so they
 # look like they come from the same place.

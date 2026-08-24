@@ -4,9 +4,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics, QKeySequence
-from PySide6.QtWidgets import QFileDialog, QLabel, QMainWindow, QTabWidget
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import (
+    QAction,
+    QCloseEvent,
+    QDesktopServices,
+    QFontMetrics,
+    QKeySequence,
+)
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QTabWidget,
+)
 
 from rvBackupHelper import appConfig
 from rvBackupHelper.services.settingsService import SettingsService
@@ -74,6 +86,11 @@ class MainWindow(QMainWindow):
 
         helpMenu = self.helpMenu = self.menuBar().addMenu("&Help")
 
+        self.manualAction = QAction("User &Manual...", self)
+        self.manualAction.setShortcut(QKeySequence.StandardKey.HelpContents)  # F1
+        self.manualAction.triggered.connect(self.onHelpManual)
+        helpMenu.addAction(self.manualAction)
+
         self.aboutAction = QAction("&About", self)
         self.aboutAction.triggered.connect(self.onHelpAbout)
         helpMenu.addAction(self.aboutAction)
@@ -119,6 +136,23 @@ class MainWindow(QMainWindow):
     def onClipRecorded(self, path: Path) -> None:
         """Load a just-finished recording so Calibrate is ready on switch."""
         self.calibrationView.openClip(path)
+
+    def onHelpManual(self) -> None:
+        """Open the rendered manual in a browser.
+
+        The online copy rather than the local files: GitHub draws the markdown
+        and its screenshots, while a checkout's .md would open in a text editor
+        and an installed copy may carry no docs at all.
+        """
+        if QDesktopServices.openUrl(QUrl(appConfig.manualUrl)):
+            self.showStatus("The manual is opening in your browser.")
+            return
+        # Leaving the user with nothing is worse than making them copy a URL.
+        QMessageBox.information(
+            self,
+            "User Manual",
+            f"Could not open a browser. The manual is at:\n\n{appConfig.manualUrl}",
+        )
 
     def onHelpAbout(self) -> None:
         if showAbout(self):

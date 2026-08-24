@@ -6,8 +6,10 @@ from pathlib import Path
 
 import pytest
 from PySide6.QtCore import QSettings
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QFileDialog
 
+from rvBackupHelper import appConfig
 from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.ui.mainWindow import MainWindow
 
@@ -50,7 +52,8 @@ def testMenuBarStructure(qtbot) -> None:
     assert fileItems == ["&Open Clip...", "&Recordings Folder...", "E&xit"]
     assert any(a.isSeparator() for a in mainWindow.fileMenu.actions())
 
-    assert [a.text() for a in mainWindow.helpMenu.actions()] == ["&About"]
+    helpItems = [a.text() for a in mainWindow.helpMenu.actions()]
+    assert helpItems == ["User &Manual...", "&About"]
 
 
 def testViewStatusMessagesReachTheStatusBar(qtbot) -> None:
@@ -145,6 +148,46 @@ def testLongFolderPathIsElidedButFullyAvailableOnHover(
 
     assert "…" in mainWindow.recordingsLabel.text()
     assert mainWindow.recordingsLabel.toolTip() == str(deep)
+
+
+def testManualOpensInABrowser(qtbot, monkeypatch) -> None:
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    opened: list[str] = []
+    monkeypatch.setattr(
+        "rvBackupHelper.ui.mainWindow.QDesktopServices.openUrl",
+        lambda url: opened.append(url.toString()) or True,
+    )
+
+    mainWindow.manualAction.trigger()
+
+    assert opened == [appConfig.manualUrl]
+    assert "manual is opening" in mainWindow.statusBar().currentMessage()
+
+
+def testManualFallsBackToShowingTheAddress(qtbot, monkeypatch) -> None:
+    """Leaving the user with nothing is worse than making them copy a URL."""
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    monkeypatch.setattr(
+        "rvBackupHelper.ui.mainWindow.QDesktopServices.openUrl", lambda url: False
+    )
+    shown: list[str] = []
+    monkeypatch.setattr(
+        "rvBackupHelper.ui.mainWindow.QMessageBox.information",
+        lambda parent, title, text: shown.append(text),
+    )
+
+    mainWindow.onHelpManual()
+
+    assert appConfig.manualUrl in shown[0]
+
+
+def testManualHasTheStandardHelpShortcut(qtbot) -> None:
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+
+    assert mainWindow.manualAction.shortcut() == QKeySequence.StandardKey.HelpContents
 
 
 def testAboutOpensTheDialogAndReportsADonation(qtbot, monkeypatch) -> None:
