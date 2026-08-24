@@ -147,12 +147,14 @@ def testLongFolderPathIsElidedButFullyAvailableOnHover(
     assert mainWindow.recordingsLabel.toolTip() == str(deep)
 
 
-def testAboutTextContents(qtbot) -> None:
+def testAboutOpensTheDialogAndReportsADonation(qtbot, monkeypatch) -> None:
+    """The About text itself is covered in testAboutDialog."""
     mainWindow = MainWindow()
     qtbot.addWidget(mainWindow)
+    monkeypatch.setattr(
+        "rvBackupHelper.ui.mainWindow.showAbout", lambda parent: True
+    )
 
-    aboutText = mainWindow.buildAboutText()
-    assert "RV Backup Helper" in aboutText
-    assert "Editor: Francois Charette" in aboutText
-    assert "AI Agent: Claude - Fable 5" in aboutText
-    assert "Charette AI Group, LLC" in aboutText
+    mainWindow.onHelpAbout()
+
+    assert "donation page" in mainWindow.statusBar().currentMessage()

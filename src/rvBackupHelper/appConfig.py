@@ -10,8 +10,16 @@ organizationName = "Charette AI Group"
 
 # Help > About contents
 editorName = "Francois Charette, PhD"
-aiAgentName = "Claude - Fable 5"
+aiAgentName = "Claude - Opus 5"
 copyrightHolder = "Charette AI Group, LLC"
+repoUrl = "https://github.com/Charette-AI-Group/rvBackupHelper"
+
+# Donate button, matching the sibling Charette AI Group applications so they
+# look like they come from the same place.
+donateUrl = "https://www.paypal.com/donate/?hosted_button_id=FEM4WLD7LHY36"
+donateColour = "#f0b232"
+donateTextColour = "#1f1e1b"
+donatePressedColour = "#d9991f"
 
 projectRoot = Path(__file__).resolve().parents[2]
 resourcesDir = Path(__file__).resolve().parent / "resources"

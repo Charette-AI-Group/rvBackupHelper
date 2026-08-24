@@ -2,23 +2,17 @@
 
 from __future__ import annotations
 
-import datetime
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics, QKeySequence
-from PySide6.QtWidgets import (
-    QFileDialog,
-    QLabel,
-    QMainWindow,
-    QMessageBox,
-    QTabWidget,
-)
+from PySide6.QtWidgets import QFileDialog, QLabel, QMainWindow, QTabWidget
 
 from rvBackupHelper import appConfig
 from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.ui.calibration.calibrationView import CalibrationView
 from rvBackupHelper.ui.capture.captureView import CaptureView
+from rvBackupHelper.ui.dialogs.aboutDialog import showAbout
 
 # Pixel budget for the status-bar path before it is elided in the middle.
 recordingsLabelWidth = 420
@@ -126,23 +120,9 @@ class MainWindow(QMainWindow):
         """Load a just-finished recording so Calibrate is ready on switch."""
         self.calibrationView.openClip(path)
 
-    def buildAboutText(self) -> str:
-        year = datetime.date.today().year
-        return (
-            f"<h3>{appConfig.appName}</h3>"
-            f"<p>Version {appConfig.appVersion}</p>"
-            f"<p>Editor: {appConfig.editorName}<br>"
-            f"AI Agent: {appConfig.aiAgentName}</p>"
-            f"<p>&copy; {year} {appConfig.copyrightHolder}</p>"
-        )
-
     def onHelpAbout(self) -> None:
-        aboutBox = QMessageBox(self)
-        aboutBox.setWindowTitle(f"About {appConfig.appName}")
-        aboutBox.setText(self.buildAboutText())
-        # QMessageBox ignores resize/setMinimumWidth; widening its label works.
-        aboutBox.setStyleSheet("QLabel { min-width: 420px; }")
-        aboutBox.exec()
+        if showAbout(self):
+            self.showStatus("Thank you - the donation page is opening in your browser.")
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self.captureView.shutdown()
