@@ -81,6 +81,14 @@ class CalibrationView(QWidget):
     def setRecordingsDir(self, path: Path) -> None:
         self.clipBrowser.setRecordingsDir(path)
 
+    def openClip(self, path: Path) -> None:
+        """Load a clip directly, for a recording that has just finished."""
+        self.clipBrowser.openClip(path)
+
+    def onOpenClipClicked(self) -> None:
+        """Raise the browser's Open dialog, for the File menu."""
+        self.clipBrowser.onOpenClicked()
+
     def buildUi(self) -> None:
         self.clipBrowser = ClipBrowser()
         self.clipBrowser.statusMessage.connect(self.statusMessage)

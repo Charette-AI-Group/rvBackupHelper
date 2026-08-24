@@ -1,7 +1,8 @@
 """Opens a recorded clip and steps through it frame by frame.
 
-Shared by the Review tab and the Calibrate tab so the seek behaviour and the
-transport controls have exactly one implementation.
+Embedded by the Calibrate tab. Kept as its own widget rather than folded in,
+so the seek behaviour and the transport controls stay one implementation if a
+second consumer ever appears.
 """
 
 from __future__ import annotations
@@ -67,7 +68,7 @@ class ClipBrowser(QWidget):
         header.addWidget(self.clipLabel, stretch=1)
 
         self.videoDisplay = VideoDisplay()
-        self.videoDisplay.clear("Open a clip to review")
+        self.videoDisplay.clear("Open a clip")
 
         self.previousButton = QPushButton("< Previous")
         self.previousButton.clicked.connect(self.onPreviousClicked)

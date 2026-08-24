@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "sourceClip": "2026-08-19_09-39-59.mkv",
+  "frameIndex": 441,
+  "frameWidth": 640,
+  "frameHeight": 360,
+  "overlayCanvasWidth": 136,
+  "overlayCanvasHeight": 96,
+  "points": [
+    {
+      "distanceFeet": 0.0,
+      "scanLine": 346,
+      "frameIndex": 441,
+      "overlayRow": 92,
+      "leftEdge": 449,
+      "overlayLeft": 95,
+      "rightEdge": 124,
+      "overlayRight": 26
+    },
+    {
+      "distanceFeet": 1.0,
+      "scanLine": 324,
+      "frameIndex": 1001,
+      "overlayRow": 86,
+      "leftEdge": 447,
+      "overlayLeft": 95,
+      "rightEdge": 126,
+      "overlayRight": 27
+    },
+    {
+      "distanceFeet": 2.0,
+      "scanLine": 294,
+      "frameIndex": 1642,
+      "overlayRow": 78,
+      "leftEdge": 445,
+      "overlayLeft": 95,
+      "rightEdge": 130,
+      "overlayRight": 28
+    },
+    {
+      "distanceFeet": 4.0,
+      "scanLine": 241,
+      "frameIndex": 2123,
+      "overlayRow": 64,
+      "leftEdge": 437,
+      "overlayLeft": 93,
+      "rightEdge": 138,
+      "overlayRight": 29
+    },
+    {
+      "distanceFeet": 8.0,
+      "scanLine": 151,
+      "frameIndex": 2884,
+      "overlayRow": 40,
+      "leftEdge": 416,
+      "overlayLeft": 88,
+      "rightEdge": 161,
+      "overlayRight": 34
+    },
+    {
+      "distanceFeet": 12.0,
+      "scanLine": 90,
+      "frameIndex": 3685,
+      "overlayRow": 24,
+      "leftEdge": 400,
+      "overlayLeft": 85,
+      "rightEdge": 186,
+      "overlayRight": 40
+    },
+    {
+      "distanceFeet": 16.0,
+      "scanLine": 51,
+      "frameIndex": 4326,
+      "overlayRow": 14,
+      "leftEdge": 384,
+      "overlayLeft": 82,
+      "rightEdge": 207,
+      "overlayRight": 44
+    },
+    {
+      "distanceFeet": 20.0,
+      "scanLine": 23,
+      "frameIndex": 5047,
+      "overlayRow": 6,
+      "leftEdge": 373,
+      "overlayLeft": 79,
+      "rightEdge": 219,
+      "overlayRight": 47
+    },
+    {
+      "distanceFeet": 24.0,
+      "scanLine": 4,
+      "frameIndex": 5808,
+      "overlayRow": 1,
+      "leftEdge": 362,
+      "overlayLeft": 77,
+      "rightEdge": 231,
+      "overlayRight": 49
+    }
+  ]
+}

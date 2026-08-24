@@ -1,18 +1,15 @@
-"""Report black and white levels in recorded clips, to locate a level problem.
+r"""Report black, white and clipping levels in recorded clips.
 
-A correctly terminated composite signal puts real blacks near zero. A lifted
-black floor means the whole signal is riding high, which is a signal-path
-problem rather than a lighting one - an auto-exposure camera pointed at bright
-concrete still gives you near-black shadows somewhere in frame.
+Composite video that is riding too high clips at the white end: real detail
+gets flattened into 255 and cannot be recovered. That is the reliable symptom,
+because it does not depend on what is in shot.
 
-    .venv\\Scripts\\python.exe tools\\measureVideoLevels.py recordings\\*.avi
+A lifted black floor on its own is weaker evidence. A sunlit concrete driveway
+genuinely contains no black, so a high floor there is the scene, not the
+signal. Read the two together: clipping plus a lifted floor means the signal is
+too big; a lifted floor with no clipping usually just means a bright scene.
 
-Rough reading of the black floor:
-
-      0 -  10   correct
-     10 -  60   something is lifting the signal
-     60 +       roughly double amplitude; suspect a missing or doubled 75 ohm
-                termination, or a reversed connection through the shield
+    .venv\Scripts\python.exe tools\measureVideoLevels.py recordings\*.avi
 """
 
 from __future__ import annotations
@@ -25,6 +22,20 @@ import numpy as np
 
 from rvBackupHelper.services.review.clipReaderService import ClipReaderService
 
+# Above this share of pixels pinned at white, detail is being lost.
+clippingWarnPercent = 0.5
+clippingBadPercent = 2.0
+
+
+def verdictFor(clipped: float, black: float) -> str:
+    if clipped >= clippingBadPercent:
+        return "CLIPPING - signal too high"
+    if clipped >= clippingWarnPercent:
+        return "some clipping"
+    if black > 60:
+        return "ok, but bright scene"
+    return "ok"
+
 
 def describe(path: Path, samples: int) -> None:
     reader = ClipReaderService()
@@ -35,21 +46,23 @@ def describe(path: Path, samples: int) -> None:
         return
     try:
         indices = [int(info.frameCount * (i + 0.5) / samples) for i in range(samples)]
-        lows, means, highs = [], [], []
+        lows, means, highs, clipped = [], [], [], []
         for index in indices:
             grey = cv2.cvtColor(reader.readFrameAt(index), cv2.COLOR_BGR2GRAY)
             low, high = np.percentile(grey, (1, 99))
             lows.append(low)
             means.append(float(grey.mean()))
             highs.append(high)
+            clipped.append(100.0 * float((grey >= 254).mean()))
     finally:
         reader.close()
 
     black = float(np.mean(lows))
-    verdict = "ok" if black <= 10 else ("lifted" if black <= 60 else "BADLY LIFTED")
+    pinned = float(np.mean(clipped))
     print(
-        f"{path.name:<32} black {black:5.0f}   mean {np.mean(means):5.0f}   "
-        f"white {np.mean(highs):5.0f}   {verdict}"
+        f"{path.name:<32} {info.frameWidth}x{info.frameHeight}  "
+        f"black {black:5.0f}  mean {np.mean(means):5.0f}  white {np.mean(highs):5.0f}  "
+        f"clipped {pinned:5.2f}%  {verdictFor(pinned, black)}"
     )
 
 
@@ -59,7 +72,6 @@ def main() -> int:
     parser.add_argument("--samples", type=int, default=12, help="frames per clip")
     args = parser.parse_args()
 
-    print(f"{'clip':<32} {'black':>9} {'mean':>9} {'white':>9}")
     for pattern in args.clips:
         paths = sorted(Path().glob(pattern)) if "*" in pattern else [Path(pattern)]
         for path in paths:

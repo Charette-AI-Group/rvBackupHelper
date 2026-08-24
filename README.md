@@ -48,9 +48,11 @@ the camera passes through clean. **Record calibration footage with it off** — 
 into the clip sits right on top of the markings you need to click afterwards. It needs the
 generated grid sketch flashed (the bring-up sketch takes no commands) and takes a couple of
 seconds, because opening a serial port resets the board. The state is kept in the Arduino's
-EEPROM, so it survives that reset, an unplug, and closing the app. Starting capture on a device with no signal is fine: the preview shows
-"Waiting for video signal" and starts as soon as video arrives, which is what an RV camera
-powered only in reverse gear needs.
+EEPROM, so it survives that reset, an unplug, and closing the app.
+
+Starting capture on a device with no signal is fine: the preview shows "Waiting for video
+signal" and starts as soon as video arrives, which is what an RV camera powered only in
+reverse gear needs.
 
 Clips are timestamped `.avi` files, MJPG encoded. MJPG compresses each frame on its own,
 so every frame decodes independently and seeking is frame-exact — which is what calibration
@@ -63,12 +65,10 @@ end of the status bar. Pointing it outside the project is the safer habit — no
 the ignore rule — and it is what you want on the laptop, where clips can go straight to an
 external drive.
 
-**Review tab** — open a clip and step through it with the slider, the frame spin box, or
-Previous/Next. A clip you just recorded is loaded here automatically.
-
-**Calibrate tab** — the same clip browser with a measurement panel. Open the clip you
-recorded behind the RV, step to the frame where your distance markers are readable, set a
-distance, then **click that marker in the image**. Each click records the scan line it landed
+**Calibrate tab** — a clip browser and a measurement panel side by side. Open a clip and
+step through it with the slider, the frame spin box, or Previous/Next; a clip you just
+recorded is loaded here automatically. Step to the frame where your distance markers are
+readable, set a distance, then **click that marker in the image**. Each click records the scan line it landed
 on and draws an amber guide there, so you can see immediately whether it sits on the mark.
 
 The table shows the distance, the **scan line** in the captured frame, the **OSD row** — the
@@ -116,9 +116,8 @@ guide. Distances listed in `appConfig.emphasisedDistancesFeet` — 1 ft by defau
 to touch something" line — are drawn double thickness, which is the only hierarchy monochrome
 allows. Thickness grows downward so the far edge stays on the measured line.
 
-Lines are not tapered to suggest perspective: that would imply a width nobody measured, since
-the calibration records vertical mapping only. Vehicle-width guides would need horizontal
-calibration, which the tool does not yet collect.
+The distance lines are not tapered to suggest perspective: that would imply a width nobody
+measured. The vehicle-width corridor is drawn separately, from edges you actually marked.
 
 ## Tests and lint
 

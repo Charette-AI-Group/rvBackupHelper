@@ -30,12 +30,13 @@ def testMainWindowOpens(qtbot) -> None:
     assert mainWindow.statusBar().currentMessage() == "Ready"
 
 
-def testAllThreeTabsArePresent(qtbot) -> None:
+def testBothTabsArePresent(qtbot) -> None:
+    """Calibrate embeds the clip browser, so a separate Review tab is redundant."""
     mainWindow = MainWindow()
     qtbot.addWidget(mainWindow)
 
     tabTitles = [mainWindow.tabs.tabText(i) for i in range(mainWindow.tabs.count())]
-    assert tabTitles == ["Capture", "Review", "Calibrate"]
+    assert tabTitles == ["Capture", "Calibrate"]
 
 
 def testMenuBarStructure(qtbot) -> None:
@@ -58,9 +59,6 @@ def testViewStatusMessagesReachTheStatusBar(qtbot) -> None:
 
     mainWindow.captureView.statusMessage.emit("Capturing.")
     assert mainWindow.statusBar().currentMessage() == "Capturing."
-
-    mainWindow.reviewBrowser.statusMessage.emit("Opened clip.avi")
-    assert mainWindow.statusBar().currentMessage() == "Opened clip.avi"
 
     mainWindow.calibrationView.statusMessage.emit("Marked 3 ft at scan line 412.")
     assert mainWindow.statusBar().currentMessage() == "Marked 3 ft at scan line 412."
@@ -94,7 +92,6 @@ def testStoredRecordingsFolderReachesEveryTabOnStartup(
     qtbot.addWidget(mainWindow)
 
     assert mainWindow.captureView.recordingsDir == chosen
-    assert mainWindow.reviewBrowser.recordingsDir == chosen
     assert mainWindow.calibrationView.clipBrowser.recordingsDir == chosen
 
 
@@ -113,7 +110,6 @@ def testChoosingAFolderPersistsItAndUpdatesEverything(
 
     assert mainWindow.recordingsDir == chosen
     assert mainWindow.captureView.recordingsDir == chosen
-    assert mainWindow.reviewBrowser.recordingsDir == chosen
     assert mainWindow.calibrationView.clipBrowser.recordingsDir == chosen
     assert mainWindow.recordingsLabel.toolTip() == str(chosen)
     assert str(chosen) in mainWindow.statusBar().currentMessage()
@@ -135,7 +131,7 @@ def testCancellingTheFolderDialogChangesNothing(
 
     assert mainWindow.recordingsDir == before
     assert mainWindow.captureView.recordingsDir == before
-    assert mainWindow.reviewBrowser.recordingsDir == before
+    assert mainWindow.calibrationView.clipBrowser.recordingsDir == before
 
 
 def testLongFolderPathIsElidedButFullyAvailableOnHover(
