@@ -123,7 +123,8 @@ its own folder automatically.
 IDE's upload button does — **the Arduino IDE is only needed if you want to edit a sketch by
 hand.** It takes a few seconds and reports the board's own size summary when it finishes. It
 needs `arduino-cli` installed (see below); without it the button says so and points you at
-the IDE.
+the IDE. It offers the last sketch you generated, remembered between sessions, so a sketch
+saved under its own name is still what Upload flashes after a restart.
 
 See **Arduino Grid** on the Capture tab for turning the overlay off before recording.
 

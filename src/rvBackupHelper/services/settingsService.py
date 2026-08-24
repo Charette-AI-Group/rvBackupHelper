@@ -12,6 +12,7 @@ from rvBackupHelper import appConfig
 logger = logging.getLogger(__name__)
 
 recordingsDirKey = "paths/recordingsDir"
+lastSketchKey = "paths/lastSketch"
 
 
 class SettingsService:
@@ -34,3 +35,18 @@ class SettingsService:
         self.settings.setValue(recordingsDirKey, str(path))
         self.settings.sync()
         logger.info("Recordings folder set to %s", path)
+
+    def lastSketchPath(self) -> Path | None:
+        """The sketch generated most recently, so Upload can offer it again.
+
+        None when nothing has been generated yet. Whether the file still
+        exists is the caller's business: it may have been renamed or deleted
+        since.
+        """
+        stored = self.settings.value(lastSketchKey, "", type=str)
+        return Path(stored) if stored else None
+
+    def setLastSketchPath(self, path: Path) -> None:
+        self.settings.setValue(lastSketchKey, str(path))
+        self.settings.sync()
+        logger.info("Last generated sketch is %s", path)

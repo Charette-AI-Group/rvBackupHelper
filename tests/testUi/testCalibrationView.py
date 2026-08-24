@@ -8,9 +8,11 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
+from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QFileDialog
 
 from rvBackupHelper import appConfig
+from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.ui.calibration.calibrationView import CalibrationView
 
 frameWidth = 640
@@ -32,8 +34,17 @@ def writeClip(path: Path, frameCount: int = 4, width: int = frameWidth) -> Path:
 
 
 @pytest.fixture
-def view(qtbot) -> CalibrationView:
-    calibrationView = CalibrationView()
+def settingsService(tmp_path: Path) -> SettingsService:
+    """Isolated settings: the view now stores the last sketch it generated,
+    and tests must not write that into the real user preferences."""
+    return SettingsService(
+        QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat)
+    )
+
+
+@pytest.fixture
+def view(qtbot, settingsService: SettingsService) -> CalibrationView:
+    calibrationView = CalibrationView(settingsService=settingsService)
     qtbot.addWidget(calibrationView)
     return calibrationView
 
@@ -267,3 +278,73 @@ def testLoadingABrokenFileReportsItAndKeepsState(
 
     assert len(viewWithClip.calibration.points) == 1
     assert "not valid JSON" in messages[-1]
+
+
+def makeSketch(folder: Path) -> Path:
+    """A sketch laid out the way the Arduino tools require."""
+    folder.mkdir(parents=True, exist_ok=True)
+    sketch = folder / f"{folder.name}.ino"
+    sketch.write_text("void setup(){}", encoding="utf-8")
+    return sketch
+
+
+def viewSharing(qtbot, settingsFile: Path) -> CalibrationView:
+    """A view backed by a named settings file, so two can share one."""
+    service = SettingsService(
+        QSettings(str(settingsFile), QSettings.Format.IniFormat)
+    )
+    calibrationView = CalibrationView(settingsService=service)
+    qtbot.addWidget(calibrationView)
+    return calibrationView
+
+
+def testUploadIsOfferedForTheLastSketchAfterARestart(qtbot, tmp_path: Path) -> None:
+    """A sketch saved under its own name must still be offered next launch."""
+    settingsFile = tmp_path / "settings.ini"
+    sketch = makeSketch(tmp_path / "rvbhGridV2")
+    first = viewSharing(qtbot, settingsFile)
+    first.settingsService.setLastSketchPath(sketch)
+
+    # A fresh view, as after restarting, sharing only the stored settings.
+    reopened = viewSharing(qtbot, settingsFile)
+
+    assert reopened.uploadTarget() == sketch
+    assert reopened.uploadButton.isEnabled()
+    assert "rvbhGridV2" in reopened.uploadButton.toolTip()
+
+
+def testThisSessionsSketchWinsOverTheRememberedOne(
+    view: CalibrationView, tmp_path: Path
+) -> None:
+    view.settingsService.setLastSketchPath(makeSketch(tmp_path / "rvbhGridV1"))
+    justGenerated = makeSketch(tmp_path / "rvbhGridV3")
+
+    view.sketchPath = justGenerated
+
+    assert view.uploadTarget() == justGenerated
+
+
+def testARememberedSketchThatIsGoneIsNotOffered(
+    view: CalibrationView, tmp_path: Path
+) -> None:
+    """It may have been renamed or deleted since it was generated."""
+    view.settingsService.setLastSketchPath(tmp_path / "vanished" / "vanished.ino")
+
+    view.updateControls()
+
+    assert not view.uploadButton.isEnabled()
+    assert "Generate a sketch first" in view.uploadButton.toolTip()
+
+
+def testGeneratingRemembersThePathForNextTime(
+    viewWithClip: CalibrationView, tmp_path: Path, monkeypatch
+) -> None:
+    target = tmp_path / "rvbhGridV9" / "rvbhGridV9.ino"
+    viewWithClip.onFramePointClicked(320, 430)
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName", staticmethod(lambda *args: (str(target), ""))
+    )
+
+    viewWithClip.onGenerateSketchClicked()
+
+    assert viewWithClip.settingsService.lastSketchPath() == target

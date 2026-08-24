@@ -28,7 +28,7 @@ class MainWindow(QMainWindow):
         self.captureView = CaptureView()
         # Calibrate embeds the same clip browser a separate Review tab would
         # have been, so a second copy earned nothing.
-        self.calibrationView = CalibrationView()
+        self.calibrationView = CalibrationView(settingsService=self.settingsService)
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self.captureView, "Capture")

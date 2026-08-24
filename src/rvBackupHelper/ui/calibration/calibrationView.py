@@ -40,6 +40,7 @@ from rvBackupHelper.services.calibration.calibrationService import (
     CalibrationService,
     defaultCalibrationPath,
 )
+from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.services.sketch.sketchService import (
     SketchError,
     SketchService,
@@ -70,8 +71,13 @@ class CalibrationView(QWidget):
 
     statusMessage = Signal(str)
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        settingsService: SettingsService | None = None,
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
+        self.settingsService = settingsService or SettingsService()
         self.service = CalibrationService()
         self.sketchService = SketchService()
         self.calibration = Calibration()
@@ -320,6 +326,7 @@ class CalibrationView(QWidget):
             self.statusMessage.emit(f"Could not generate sketch: {exc}")
             return
         self.sketchPath = path
+        self.settingsService.setLastSketchPath(path)
         moved = "" if path == chosen else f" (in {path.parent.name}/, as Arduino requires)"
         self.statusMessage.emit(
             f"Wrote {len(self.calibration.points)} grid line(s) to {path.name}{moved}"
@@ -329,8 +336,18 @@ class CalibrationView(QWidget):
     # ------------------------------------------------------------ upload --
 
     def uploadTarget(self) -> Path:
-        """The sketch to flash: the one just generated, else the default."""
-        return self.sketchPath or defaultSketchPath()
+        """The sketch to flash.
+
+        This session's if one was generated, else the last one generated in
+        any session, else the default path. Remembering it is what lets Upload
+        still offer a sketch saved under its own name after a restart.
+        """
+        remembered = self.settingsService.lastSketchPath()
+        for candidate in (self.sketchPath, remembered, defaultSketchPath()):
+            if candidate is not None and candidate.exists():
+                return candidate
+        # Nothing on disk; return the default so the message names something.
+        return defaultSketchPath()
 
     def onUploadClicked(self) -> None:
         if self.uploadWorker is not None:
@@ -436,8 +453,15 @@ class CalibrationView(QWidget):
         self.sketchButton.setEnabled(hasPoints)
         # Uploading needs a generated sketch on disk, not merely points in
         # memory: it flashes what was written, not what is on screen.
-        self.uploadButton.setEnabled(
-            self.uploadWorker is None and self.uploadTarget().exists()
+        target = self.uploadTarget()
+        self.uploadButton.setEnabled(self.uploadWorker is None and target.exists())
+        # Name the sketch that would actually be flashed; after a restart it is
+        # not obvious which one that is.
+        self.uploadButton.setToolTip(
+            f"Compiles and flashes {target.parent.name} with arduino-cli. Takes "
+            "a few seconds; the Arduino IDE is not needed."
+            if target.exists()
+            else "Generate a sketch first - there is nothing on disk to flash."
         )
 
     # ----------------------------------------------------------- shutdown --

@@ -69,10 +69,11 @@ Uploaded to COM3. Sketch uses 7978 bytes (24%) of program storage space.
 If `arduino-cli` is not installed the button says so and points you at the IDE
 instead. If no board is plugged in it says that.
 
-> **The button is only enabled when there is a sketch on disk to flash.** After
-> restarting the application it looks at the default path, so a sketch you saved
-> under another name is not offered until you generate again in that session.
-> Uploading it by hand still works — see below.
+The button offers **the last sketch you generated**, remembered between
+sessions — so a sketch saved as `rvbhGridV2` is still what Upload flashes after
+a restart. Hover the button to see which one it will use. If that file has since
+been renamed or deleted it falls back to the default path, and if nothing is
+there the button is disabled and says so.
 
 ## Uploading by hand
 
