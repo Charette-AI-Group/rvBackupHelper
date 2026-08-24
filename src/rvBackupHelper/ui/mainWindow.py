@@ -138,12 +138,20 @@ class MainWindow(QMainWindow):
         self.calibrationView.openClip(path)
 
     def onHelpManual(self) -> None:
-        """Open the rendered manual in a browser.
+        """Open the manual, preferring the copy in this checkout.
 
-        The online copy rather than the local files: GitHub draws the markdown
-        and its screenshots, while a checkout's .md would open in a text editor
-        and an installed copy may carry no docs at all.
+        A checkout has the screenshots sitting beside the markdown and needs
+        neither the network nor a GitHub login - which matters, because the
+        repository is private. The rendered copy on GitHub is the fallback for
+        an install that carries no docs, and for the case where the system has
+        nothing willing to open a .md file.
         """
+        local = appConfig.manualPath
+        if local.exists() and QDesktopServices.openUrl(
+            QUrl.fromLocalFile(str(local))
+        ):
+            self.showStatus(f"Opening {local}")
+            return
         if QDesktopServices.openUrl(QUrl(appConfig.manualUrl)):
             self.showStatus("The manual is opening in your browser.")
             return
@@ -151,7 +159,8 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "User Manual",
-            f"Could not open a browser. The manual is at:\n\n{appConfig.manualUrl}",
+            "Could not open the manual. It is at:\n\n"
+            f"{local}\n\n{appConfig.manualUrl}",
         )
 
     def onHelpAbout(self) -> None:

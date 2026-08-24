@@ -150,14 +150,40 @@ def testLongFolderPathIsElidedButFullyAvailableOnHover(
     assert mainWindow.recordingsLabel.toolTip() == str(deep)
 
 
-def testManualOpensInABrowser(qtbot, monkeypatch) -> None:
-    mainWindow = MainWindow()
-    qtbot.addWidget(mainWindow)
+def openedUrls(monkeypatch) -> list[str]:
+    """Collect what the app asked the desktop to open, and say it worked."""
     opened: list[str] = []
     monkeypatch.setattr(
         "rvBackupHelper.ui.mainWindow.QDesktopServices.openUrl",
         lambda url: opened.append(url.toString()) or True,
     )
+    return opened
+
+
+def testManualPrefersTheCopyInTheCheckout(qtbot, monkeypatch, tmp_path) -> None:
+    """No network and no GitHub login needed, which matters: the repo is private."""
+    local = tmp_path / "README.md"
+    local.write_text("# manual", encoding="utf-8")
+    monkeypatch.setattr(appConfig, "manualPath", local)
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    opened = openedUrls(monkeypatch)
+
+    mainWindow.manualAction.trigger()
+
+    assert len(opened) == 1
+    assert opened[0].startswith("file:")
+    assert opened[0].endswith("README.md")
+    assert str(local) in mainWindow.statusBar().currentMessage()
+
+
+def testManualFallsBackOnlineWhenThereIsNoCheckout(
+    qtbot, monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setattr(appConfig, "manualPath", tmp_path / "absent" / "README.md")
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    opened = openedUrls(monkeypatch)
 
     mainWindow.manualAction.trigger()
 
@@ -165,7 +191,34 @@ def testManualOpensInABrowser(qtbot, monkeypatch) -> None:
     assert "manual is opening" in mainWindow.statusBar().currentMessage()
 
 
-def testManualFallsBackToShowingTheAddress(qtbot, monkeypatch) -> None:
+def testManualFallsBackOnlineWhenNothingOpensMarkdown(
+    qtbot, monkeypatch, tmp_path
+) -> None:
+    """A .md with no file association fails to open; the web copy still works."""
+    local = tmp_path / "README.md"
+    local.write_text("# manual", encoding="utf-8")
+    monkeypatch.setattr(appConfig, "manualPath", local)
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    attempted: list[str] = []
+
+    def openUrl(url):
+        attempted.append(url.toString())
+        return not url.isLocalFile()
+
+    monkeypatch.setattr(
+        "rvBackupHelper.ui.mainWindow.QDesktopServices.openUrl", openUrl
+    )
+
+    mainWindow.manualAction.trigger()
+
+    assert len(attempted) == 2
+    assert attempted[0].startswith("file:")
+    assert attempted[1] == appConfig.manualUrl
+    assert "manual is opening" in mainWindow.statusBar().currentMessage()
+
+
+def testManualShowsBothAddressesWhenNothingOpens(qtbot, monkeypatch) -> None:
     """Leaving the user with nothing is worse than making them copy a URL."""
     mainWindow = MainWindow()
     qtbot.addWidget(mainWindow)
@@ -180,6 +233,7 @@ def testManualFallsBackToShowingTheAddress(qtbot, monkeypatch) -> None:
 
     mainWindow.onHelpManual()
 
+    assert str(appConfig.manualPath) in shown[0]
     assert appConfig.manualUrl in shown[0]
 
 

@@ -56,9 +56,14 @@ microcontroller cannot generate while it is also locking to the camera.
 
 ## Reaching this manual from the application
 
-**Help → User Manual…**, or **F1**, opens these pages in a browser. It opens the
-copy on GitHub rather than the files in a checkout, because GitHub renders the
-markdown and its screenshots while a local `.md` would open in a text editor.
+**Help → User Manual…**, or **F1**, opens these pages. It prefers the copy in
+your own checkout — no network, no GitHub sign-in — and falls back to the
+rendered copy on GitHub for an install that carries no docs, or if nothing on
+the system is willing to open a `.md` file.
+
+A markdown viewer is worth having for the local copy; without one the file
+opens in whatever editor is associated with `.md`, and the screenshots will not
+be drawn inline.
 
 ## Help, and supporting the work
 
