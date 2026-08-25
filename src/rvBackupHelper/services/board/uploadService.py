@@ -81,7 +81,7 @@ class UploadService:
             raise UploadError(f"Could not run arduino-cli: {exc}") from exc
 
         if result.returncode != 0:
-            raise UploadError(self.explainFailure(result.stdout, result.stderr))
+            raise UploadError(self.explainFailure(cli, result.stdout, result.stderr))
         return self.summarise(result.stdout, port)
 
     def sketchDirectory(self, sketchPath: Path) -> Path:
@@ -97,13 +97,56 @@ class UploadService:
             )
         return sketchDir
 
-    def explainFailure(self, stdout: str, stderr: str) -> str:
-        """Keep the part of the output that names the problem."""
+    def explainFailure(self, cli: str, stdout: str, stderr: str) -> str:
+        """Keep the part of the output that names the problem, and say who said it.
+
+        "Platform not installed" means the core is missing from the data
+        directory *this* arduino-cli is using, which is a narrower claim than
+        it sounds. That directory is derived from the environment, so a process
+        launched with a different one reads an empty folder and reports a core
+        that is in fact installed - and the message's own suggestion, to
+        install it, quietly creates a second copy rather than fixing the
+        mismatch. Naming the binary and the directory turns that into a quick
+        comparison instead of a long hunt.
+        """
         output = (stderr or stdout or "").strip()
         lines = [line for line in output.splitlines() if line.strip()]
         # The last few lines carry the error; the rest is progress chatter.
         tail = "\n".join(lines[-6:]) if lines else "no output"
-        return f"arduino-cli failed:\n{tail}"
+        message = (
+            f"arduino-cli failed:\n{tail}\n\n"
+            f"Using: {cli}\n"
+            f"Data directory: {self.dataDirectory(cli)}"
+        )
+        if "platform not installed" in output.lower():
+            message += (
+                "\n\nCores live in that data directory. Run 'arduino-cli core "
+                "list' in a terminal: if it lists the core, the installation is "
+                "fine and this process is merely reading a different directory, "
+                "usually because it was started with a different environment, "
+                "user or elevation. Installing again would only add a second copy."
+            )
+        return message
+
+    def dataDirectory(self, cli: str) -> str:
+        """Where this arduino-cli keeps its cores, or why we cannot say.
+
+        Never raises. It runs while a failure is already being reported, and
+        losing the real error to a secondary one would be a poor trade.
+        """
+        try:
+            result = self.runner(
+                [cli, "config", "get", "directories.data"],
+                capture_output=True,
+                text=True,
+                timeout=appConfig.configQueryTimeoutSeconds,
+            )
+        except Exception:  # noqa: BLE001 - diagnostics must not mask the real failure
+            logger.debug("Could not read the arduino-cli data directory", exc_info=True)
+            return "could not be determined"
+        if result.returncode != 0 or not (result.stdout or "").strip():
+            return "could not be determined"
+        return result.stdout.strip()
 
     def summarise(self, stdout: str, port: str) -> str:
         for line in stdout.splitlines():

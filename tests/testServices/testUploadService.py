@@ -125,3 +125,69 @@ def testATimeoutIsReportedNotSwallowed(sketchDir: Path) -> None:
 
     with pytest.raises(UploadError, match="timed out"):
         service.upload(sketchDir)
+
+
+class FailingBuildRunner:
+    """Fails the build, but answers the data directory query normally.
+
+    Two different commands with two different outcomes, which a single
+    canned reply cannot express.
+    """
+
+    def __init__(self, stderr: str, dataDir: str = r"C:\Users\Someone\Arduino15") -> None:
+        self.stderr = stderr
+        self.dataDir = dataDir
+
+    def __call__(self, command, **kwargs):
+        if "config" in command:
+            return subprocess.CompletedProcess(command, 0, self.dataDir + "\n", "")
+        return subprocess.CompletedProcess(command, 1, "", self.stderr)
+
+
+def testAFailureNamesTheCliAndDataDirectoryThatProducedIt(sketchDir: Path) -> None:
+    runner = FailingBuildRunner("error: 'foo' was not declared")
+
+    service = UploadService(
+        cliFinder=lambda: r"C:\Tools\arduino-cli.exe",
+        portFinder=lambda: "COM3",
+        runner=runner,
+    )
+
+    with pytest.raises(UploadError) as caught:
+        service.upload(sketchDir)
+
+    message = str(caught.value)
+    # The real error still leads; the toolchain detail supports it.
+    assert "was not declared" in message
+    assert r"C:\Tools\arduino-cli.exe" in message
+    assert r"C:\Users\Someone\Arduino15" in message
+
+
+def testAMissingPlatformSaysToCompareRatherThanReinstall(sketchDir: Path) -> None:
+    # arduino-cli's own advice here is to install the core, which is the wrong
+    # move when the core is installed and this process is reading elsewhere.
+    runner = FailingBuildRunner(
+        "Error during build: Platform 'arduino:avr' not found: platform not installed"
+    )
+    service = serviceWith(runner)
+
+    with pytest.raises(UploadError) as caught:
+        service.upload(sketchDir)
+
+    message = str(caught.value)
+    assert "core list" in message
+    assert "second copy" in message
+
+
+def testTheDataDirectoryQueryNeverMasksTheRealFailure(sketchDir: Path) -> None:
+    def runner(command, **kwargs):
+        if "config" in command:
+            raise OSError("cannot run")
+        return subprocess.CompletedProcess(command, 1, "", "error: 'foo' was not declared")
+
+    with pytest.raises(UploadError) as caught:
+        serviceWith(runner).upload(sketchDir)
+
+    message = str(caught.value)
+    assert "was not declared" in message
+    assert "could not be determined" in message

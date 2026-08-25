@@ -126,3 +126,8 @@ boardFqbn = "arduino:avr:uno"
 # A cold compile pulls the whole core through; uploading adds a reset and a
 # verify pass.
 uploadTimeoutSeconds = 300.0
+# Asking arduino-cli where it keeps its cores, to name that in a failure. It
+# reads a config file and returns, so a short timeout is plenty - and this runs
+# while an error is already being reported, where hanging would be worse than
+# an incomplete answer.
+configQueryTimeoutSeconds = 10.0
