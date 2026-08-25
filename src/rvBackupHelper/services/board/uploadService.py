@@ -149,18 +149,50 @@ class UploadService:
         are not here either, this process is reading a different filesystem
         view than the one the cores were installed into.
         """
+        packages = Path(dataDir) / "packages"
         try:
-            hardware = Path(dataDir) / "packages"
-            if not hardware.is_dir():
-                return f"{hardware} does not exist"
+            if not packages.is_dir():
+                return f"{packages} does not exist"
             found = sorted(
-                str(path.relative_to(hardware))
-                for path in hardware.glob("*/hardware/*/*")
+                str(path.relative_to(packages))
+                for path in packages.glob("*/hardware/*/*")
                 if path.is_dir()
             )
-            return "\n".join(found) if found else f"{hardware} exists but holds no cores"
+            if found:
+                return "\n".join(found)
         except OSError as exc:
-            return f"could not be read: {exc}"
+            return f"{packages} could not be read: {exc}"
+        # Nothing matched. That is either an empty tree or one this process
+        # cannot walk, and those call for quite different remedies, so descend
+        # by hand and say where it stops rather than reporting a bare absence.
+        return f"No cores matched under {packages}.\n" + self.describeTree(packages)
+
+    def describeTree(self, root: Path, depth: int = 4) -> str:
+        """List what can actually be seen, level by level, errors included."""
+        lines: list[str] = []
+        level = [root]
+        for _ in range(depth):
+            children: list[Path] = []
+            for directory in level:
+                try:
+                    entries = sorted(directory.iterdir())
+                except OSError as exc:
+                    lines.append(f"  {directory}: cannot be listed: {exc}")
+                    continue
+                if not entries:
+                    lines.append(f"  {directory}: empty")
+                for entry in entries:
+                    try:
+                        kind = "dir" if entry.is_dir() else "file"
+                    except OSError as exc:
+                        kind = f"cannot be inspected: {exc}"
+                    lines.append(f"  {entry}: {kind}")
+                    if kind == "dir":
+                        children.append(entry)
+            if not children:
+                break
+            level = children
+        return "\n".join(lines) if lines else "  nothing at all"
 
     def arduinoEnvironment(self) -> str:
         """Any ARDUINO_* variables, which override where cores are looked for."""
