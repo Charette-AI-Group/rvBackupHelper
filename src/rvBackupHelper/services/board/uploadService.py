@@ -7,6 +7,7 @@ does. The IDE is only needed if you want to edit the sketch by hand.
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -127,12 +128,50 @@ class UploadService:
             # What this process can see, rather than advice about what to try:
             # if the core is listed here the installation is not the problem,
             # and installing again would only add a second copy.
-            message += f"\n\nCores visible to this process:\n{self.installedCores(cli)}"
+            dataDir = self.dataDirectory(cli)
+            message += (
+                f"\n\nCores visible to this process:\n{self.installedCores(cli)}"
+                f"\n\nOn disk, as this process sees it:\n{self.coresOnDisk(dataDir)}"
+                f"\n\nLOCALAPPDATA: {os.environ.get('LOCALAPPDATA', 'not set')}"
+                f"\n{self.arduinoEnvironment()}"
+            )
         return message
 
     def installedCores(self, cli: str) -> str:
         """What 'core list' reports for this process. Never raises."""
         return self.probe(cli, ["core", "list"])
+
+    def coresOnDisk(self, dataDir: str) -> str:
+        """Look for the cores directly, bypassing arduino-cli.
+
+        Separates the two ways this can go wrong. If the folders are here but
+        arduino-cli reports none, the fault is in how it was invoked; if they
+        are not here either, this process is reading a different filesystem
+        view than the one the cores were installed into.
+        """
+        try:
+            hardware = Path(dataDir) / "packages"
+            if not hardware.is_dir():
+                return f"{hardware} does not exist"
+            found = sorted(
+                str(path.relative_to(hardware))
+                for path in hardware.glob("*/hardware/*/*")
+                if path.is_dir()
+            )
+            return "\n".join(found) if found else f"{hardware} exists but holds no cores"
+        except OSError as exc:
+            return f"could not be read: {exc}"
+
+    def arduinoEnvironment(self) -> str:
+        """Any ARDUINO_* variables, which override where cores are looked for."""
+        found = {
+            name: value
+            for name, value in os.environ.items()
+            if name.upper().startswith("ARDUINO")
+        }
+        if not found:
+            return "No ARDUINO_* environment variables are set."
+        return "\n".join(f"{name}={value}" for name, value in sorted(found.items()))
 
     def dataDirectory(self, cli: str) -> str:
         """Where this arduino-cli keeps its cores, or why we cannot say."""

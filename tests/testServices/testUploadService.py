@@ -185,6 +185,24 @@ def testAMissingPlatformReportsWhatThisProcessCanActuallySee(sketchDir: Path) ->
     assert "arduino:avr 1.8.8" in message
 
 
+def testTheOnDiskCheckListsCoresArduinoCliDidNotSee(tmp_path: Path) -> None:
+    # The discriminator: folders present here but no cores reported by
+    # arduino-cli means the fault is in how it was invoked, not the install.
+    core = tmp_path / "packages" / "arduino" / "hardware" / "avr" / "1.8.8"
+    core.mkdir(parents=True)
+
+    found = UploadService().coresOnDisk(str(tmp_path))
+
+    assert "arduino" in found
+    assert "1.8.8" in found
+
+
+def testTheOnDiskCheckSaysWhenThereIsNothingThere(tmp_path: Path) -> None:
+    reported = UploadService().coresOnDisk(str(tmp_path / "absent"))
+
+    assert "does not exist" in reported
+
+
 def testTheFailureQuotesTheExactCommandItRan(sketchDir: Path) -> None:
     runner = FailingBuildRunner("error: 'foo' was not declared")
     service = serviceWith(runner)
