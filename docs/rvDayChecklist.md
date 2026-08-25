@@ -80,7 +80,7 @@ Nothing here downloads quickly on campground wifi.
   Confirm which one you have:
 
   ```powershell
-  Select-String TIMER1_CAPT_vect "$env:USERPROFILE\Documents\Arduino\libraries\TVout\video_gen.cpp"ideo_gen.cpp"
+  Select-String TIMER1_CAPT_vect "$env:USERPROFILE\Documents\Arduino\libraries\TVout\video_gen.cpp"
   ```
 
   One match is the fork. No match is the stock library, and the board will be silent.
