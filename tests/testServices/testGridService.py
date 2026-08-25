@@ -118,11 +118,15 @@ def testASerialFailureIsWrapped() -> None:
         service.setGridVisible(False)
 
 
-def testSilenceSuggestsTheWrongSketch() -> None:
-    """The bring-up sketch takes no commands, which is easy to forget."""
+def testSilencePointsAtTheLibrary() -> None:
+    """Silence reads as a serial fault and usually is not one.
+
+    It cost a session once: the board was rebooting on every sync pulse because
+    the sketch had been built against the stock TVout.
+    """
     service = serviceWith(FakeLink(reply=b""))
 
-    with pytest.raises(BoardError, match="grid sketch"):
+    with pytest.raises(BoardError, match="stock TVout"):
         service.setGridVisible(False)
 
 

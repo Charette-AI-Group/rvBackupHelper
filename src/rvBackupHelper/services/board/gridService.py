@@ -79,8 +79,13 @@ class GridService:
             reply = link.readline().decode("ascii", errors="replace").strip()
         if not reply:
             raise BoardError(
-                "The board did not answer. Is the generated grid sketch flashed? "
-                "The bring-up sketch does not accept commands."
+                "The board did not answer. The usual cause is a sketch built "
+                "against the stock TVout instead of the Video Experimenter fork: "
+                "nothing handles the input capture interrupt the overlay needs, "
+                "so the board resets on every sync pulse and never reaches its "
+                "command loop. Check which TVout is in the Arduino libraries "
+                "folder (see the README), then upload again. A board still "
+                "running the bring-up sketch is silent too - it takes no commands."
             )
         logger.info("Board replied %r to %r", reply, command)
         return reply

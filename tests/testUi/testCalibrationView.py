@@ -42,6 +42,24 @@ def settingsService(tmp_path: Path) -> SettingsService:
     )
 
 
+@pytest.fixture(autouse=True)
+def defaultSketchPathInTmp(tmp_path: Path, monkeypatch) -> Path:
+    """Isolated fallback sketch path, for the same reason settings are isolated.
+
+    uploadTarget() falls back to the default sketch when neither this session's
+    nor the remembered one is on disk, and on a machine that has actually
+    generated a grid that file exists - so tests about "nothing to flash" were
+    quietly asserting against the developer's own arduino folder and failed
+    there and nowhere else.
+    """
+    path = tmp_path / "defaultGrid" / "defaultGrid.ino"
+    monkeypatch.setattr(
+        "rvBackupHelper.ui.calibration.calibrationView.defaultSketchPath",
+        lambda: path,
+    )
+    return path
+
+
 @pytest.fixture
 def view(qtbot, settingsService: SettingsService) -> CalibrationView:
     calibrationView = CalibrationView(settingsService=settingsService)

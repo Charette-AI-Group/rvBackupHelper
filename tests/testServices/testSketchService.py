@@ -112,6 +112,16 @@ def testSketchHasTheOverlayBoilerplate(sketch: str) -> None:
     assert f"#define H {appConfig.overlayCanvasHeight}" in sketch
 
 
+def testSketchRefusesToBuildAgainstTheStockTVout(sketch: str) -> None:
+    """capture() exists only in the Video Experimenter fork.
+
+    The stock library compiles and links without complaint and then leaves the
+    input capture interrupt initOverlay() enables with no handler, so the board
+    resets on every sync pulse. Better to fail at the compiler.
+    """
+    assert "(void)&TVout::capture;" in sketch
+
+
 def testGridCountMatchesThePoints(sketch: str) -> None:
     assert "GRID_COUNT" in sketch
     assert len(gridRows(sketch)) == 3

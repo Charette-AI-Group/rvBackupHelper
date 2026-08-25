@@ -126,6 +126,13 @@ const uint8_t GRID_COUNT = sizeof(GRID) / sizeof(GRID[0]);
 $widthSection
 
 void setup() {
+  // Build-time proof that the enhanced TVout is installed: the stock library
+  // has no capture(), so this line fails to compile against it. Without the
+  // check the stock library builds happily and then leaves no handler for the
+  // input capture interrupt initOverlay() enables, so the board resets on
+  // every sync pulse and answers nothing - a silence that looks like a serial
+  // problem and is not one.
+  (void)&TVout::capture;
   pinMode(LED_BUILTIN, OUTPUT);
   // begin() returns non-zero when the frame buffer will not fit. Without it
   // nothing can be drawn, and the failure is otherwise silent: the shield
