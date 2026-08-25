@@ -14,6 +14,7 @@ time; afterwards you will mostly return to one.
 | 2 | [Capturing footage](capturing-footage.md) | Recording behind the RV, cleanly |
 | 3 | [Calibrating](calibrating.md) | Turning footage into measurements and a JSON file |
 | 4 | [Sketch and upload](sketch-and-upload.md) | Generating the sketch and flashing it |
+| 5 | [Enclosure and vehicle install](enclosure.md) | Boxing the rig and putting it in the RV |
 
 ## The workflow at a glance
 

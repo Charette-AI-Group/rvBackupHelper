@@ -1,6 +1,6 @@
 # 4. Sketch and upload
 
-[← Calibrating](calibrating.md) · [Manual index](README.md)
+[← Calibrating](calibrating.md) · [Manual index](README.md) · [Next: Enclosure and vehicle install →](enclosure.md)
 
 The last step turns the calibration into C, compiles it, and flashes it to the
 board — all from inside the application.

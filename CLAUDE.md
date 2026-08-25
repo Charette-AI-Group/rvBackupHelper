@@ -95,6 +95,45 @@ and its character set has **black-outlined glyphs**, which stay readable on any 
 Notes when we get there: flash it over its serial pads with an FTDI adapter; it has JST-GH
 pigtails that need splicing to RCA (composite is just signal + ground); power it 5V from a
 12V buck converter and do **not** feed raw RV 12V to BAT+; leave the PAL solder jumper alone.
+Availability is thin — several retailers list it out of stock or special-order only, though it
+does not look discontinued. Any MAX7456 board is equivalent for our purposes.
+
+What it buys, read off the datasheet rather than the product page:
+
+| | Video Experimenter (TVout-VE) | MAX7456 |
+|---|---|---|
+| Canvas | 136 x 96 = 13k px | 30 x 13 cells of 12x18 px = **360 x 234 = 84k px** (NTSC) |
+| Pixel states | white or nothing | **black, white or transparent** — 2 bits/px, 54 bytes/glyph |
+| Framebuffer lives in | AVR SRAM, 1632 of 2048 bytes | the chip — 480 character addresses on-die |
+| Extras | none | per-row brightness (RB0-RB15), blink, inverse, gray background, LOS output, auto NTSC/PAL |
+
+Two limitations recorded above actually go away. Black is a real per-pixel attribute, so an
+outlined white line is one glyph rather than a hack — that is the fix for lines washing out
+against bright concrete. And the vertical collapse improves from 5 scan lines per overlay row
+(480/96) to about 2 (480/234), so distances a few scan lines apart stop merging. The SRAM
+constraint disappears as well: the display memory lives on the MAX7456 and the AVR only pushes
+character codes over SPI.
+
+> **Blocker — the MAX7456 has no fail-safe passthrough, and that contradicts the whole
+> rationale for choosing an analog OSD.** VM0 bit 0 is *"Video Buffer Enable: 0 = Enable,
+> 1 = Disable (**VOUT is high impedance**)"*. That is a tri-state, not a bypass to VIN, and
+> there is no analog path from input to output anywhere in the part. Unpowered or hung, the
+> driver gets no picture at all — which is exactly the Raspberry Pi failure mode this design
+> rejected. The Video Experimenter has the property; the MAX7456 does not. Restoring it needs
+> a normally-closed SPDT relay or an analog video mux routing camera straight to display
+> unless the OSD holds it energised: an extra part in the signal path, an extra failure mode,
+> and extra space in the enclosure. **Budget for it in the Stage 2 design, not after.**
+
+**It is a character generator, not a framebuffer, so the renderer has to be rewritten.** NTSC
+needs 390 cells and the NVM holds only 256 glyphs, so no screen can have every cell unique.
+The picture has to be assembled from a reusable tile set — roughly 18 glyphs to place a
+horizontal line at any sub-row, a few dozen slope-and-offset tiles for the curved corridor
+edges, digits from the stock font, call it 100 of the 256. Workable, but it replaces the
+bitmap rasteriser with a tile quantiser and adds a one-time font upload to the NVM.
+
+**Where this leaves Stage 2:** install the Video Experimenter, get a calibrated grid working
+in the vehicle, and treat the MAX7456 as v2 once we know what the grid needs to look like on
+the road. The renderer rewrite plus the bypass relay is not a drop-in upgrade.
 
 ## Calibration — the artifact that only exists at the RV
 
