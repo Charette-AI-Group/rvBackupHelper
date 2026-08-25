@@ -127,11 +127,14 @@ def testATimeoutIsReportedNotSwallowed(sketchDir: Path) -> None:
         service.upload(sketchDir)
 
 
-class FailingBuildRunner:
-    """Fails the build, but answers the data directory query normally.
+coreListing = "ID          Installed Latest Name\narduino:avr 1.8.8     1.8.8  Arduino AVR Boards"
 
-    Two different commands with two different outcomes, which a single
-    canned reply cannot express.
+
+class FailingBuildRunner:
+    """Fails the build, but answers the diagnostic probes normally.
+
+    Three commands with three different outcomes, which a single canned reply
+    cannot express.
     """
 
     def __init__(self, stderr: str, dataDir: str = r"C:\Users\Someone\Arduino15") -> None:
@@ -141,6 +144,8 @@ class FailingBuildRunner:
     def __call__(self, command, **kwargs):
         if "config" in command:
             return subprocess.CompletedProcess(command, 0, self.dataDir + "\n", "")
+        if "core" in command:
+            return subprocess.CompletedProcess(command, 0, coreListing + "\n", "")
         return subprocess.CompletedProcess(command, 1, "", self.stderr)
 
 
@@ -163,9 +168,10 @@ def testAFailureNamesTheCliAndDataDirectoryThatProducedIt(sketchDir: Path) -> No
     assert r"C:\Users\Someone\Arduino15" in message
 
 
-def testAMissingPlatformSaysToCompareRatherThanReinstall(sketchDir: Path) -> None:
-    # arduino-cli's own advice here is to install the core, which is the wrong
-    # move when the core is installed and this process is reading elsewhere.
+def testAMissingPlatformReportsWhatThisProcessCanActuallySee(sketchDir: Path) -> None:
+    # arduino-cli's advice here is to install the core. When the core is in fact
+    # installed that is the wrong move, so show what this process sees instead
+    # of repeating guidance that may send the reader the wrong way.
     runner = FailingBuildRunner(
         "Error during build: Platform 'arduino:avr' not found: platform not installed"
     )
@@ -175,8 +181,23 @@ def testAMissingPlatformSaysToCompareRatherThanReinstall(sketchDir: Path) -> Non
         service.upload(sketchDir)
 
     message = str(caught.value)
-    assert "core list" in message
-    assert "second copy" in message
+    assert "Cores visible to this process:" in message
+    assert "arduino:avr 1.8.8" in message
+
+
+def testTheFailureQuotesTheExactCommandItRan(sketchDir: Path) -> None:
+    runner = FailingBuildRunner("error: 'foo' was not declared")
+    service = serviceWith(runner)
+
+    with pytest.raises(UploadError) as caught:
+        service.upload(sketchDir)
+
+    message = str(caught.value)
+    # Everything needed to run it by hand: board, port and the sketch folder.
+    assert "Command:" in message
+    assert appConfig.boardFqbn in message
+    assert "COM3" in message
+    assert str(sketchDir) in message
 
 
 def testTheDataDirectoryQueryNeverMasksTheRealFailure(sketchDir: Path) -> None:

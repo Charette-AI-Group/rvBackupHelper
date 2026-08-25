@@ -81,7 +81,9 @@ class UploadService:
             raise UploadError(f"Could not run arduino-cli: {exc}") from exc
 
         if result.returncode != 0:
-            raise UploadError(self.explainFailure(cli, result.stdout, result.stderr))
+            raise UploadError(
+                self.explainFailure(cli, command, result.stdout, result.stderr)
+            )
         return self.summarise(result.stdout, port)
 
     def sketchDirectory(self, sketchPath: Path) -> Path:
@@ -97,7 +99,9 @@ class UploadService:
             )
         return sketchDir
 
-    def explainFailure(self, cli: str, stdout: str, stderr: str) -> str:
+    def explainFailure(
+        self, cli: str, command: list[str], stdout: str, stderr: str
+    ) -> str:
         """Keep the part of the output that names the problem, and say who said it.
 
         "Platform not installed" means the core is missing from the data
@@ -115,34 +119,40 @@ class UploadService:
         tail = "\n".join(lines[-6:]) if lines else "no output"
         message = (
             f"arduino-cli failed:\n{tail}\n\n"
+            f"Command: {subprocess.list2cmdline(command)}\n"
             f"Using: {cli}\n"
             f"Data directory: {self.dataDirectory(cli)}"
         )
         if "platform not installed" in output.lower():
-            message += (
-                "\n\nCores live in that data directory. Run 'arduino-cli core "
-                "list' in a terminal: if it lists the core, the installation is "
-                "fine and this process is merely reading a different directory, "
-                "usually because it was started with a different environment, "
-                "user or elevation. Installing again would only add a second copy."
-            )
+            # What this process can see, rather than advice about what to try:
+            # if the core is listed here the installation is not the problem,
+            # and installing again would only add a second copy.
+            message += f"\n\nCores visible to this process:\n{self.installedCores(cli)}"
         return message
 
-    def dataDirectory(self, cli: str) -> str:
-        """Where this arduino-cli keeps its cores, or why we cannot say.
+    def installedCores(self, cli: str) -> str:
+        """What 'core list' reports for this process. Never raises."""
+        return self.probe(cli, ["core", "list"])
 
-        Never raises. It runs while a failure is already being reported, and
+    def dataDirectory(self, cli: str) -> str:
+        """Where this arduino-cli keeps its cores, or why we cannot say."""
+        return self.probe(cli, ["config", "get", "directories.data"])
+
+    def probe(self, cli: str, args: list[str]) -> str:
+        """Ask arduino-cli something small, for a failure report.
+
+        Never raises. These run while a failure is already being reported, and
         losing the real error to a secondary one would be a poor trade.
         """
         try:
             result = self.runner(
-                [cli, "config", "get", "directories.data"],
+                [cli, *args],
                 capture_output=True,
                 text=True,
                 timeout=appConfig.configQueryTimeoutSeconds,
             )
         except Exception:  # noqa: BLE001 - diagnostics must not mask the real failure
-            logger.debug("Could not read the arduino-cli data directory", exc_info=True)
+            logger.debug("Could not run arduino-cli %s", " ".join(args), exc_info=True)
             return "could not be determined"
         if result.returncode != 0 or not (result.stdout or "").strip():
             return "could not be determined"
