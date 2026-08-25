@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QRadioButton,
     QTableWidget,
@@ -366,8 +367,24 @@ class CalibrationView(QWidget):
         self.statusMessage.emit(summary)
 
     def onUploadFailed(self, message: str) -> None:
-        # Keep it on one line: the status bar cannot show a compiler trace.
-        self.statusMessage.emit(message.replace("\n", " | "))
+        # The status bar shows one line and truncates the rest, which quietly
+        # hid the part that matters: the toolchain and data directory are at the
+        # end of the message, so the reader saw arduino-cli's own misleading
+        # advice and nothing that would correct it. Headline on the bar, whole
+        # text in a dialog that can be read and copied.
+        lines = [line for line in message.splitlines() if line.strip()]
+        self.statusMessage.emit(lines[0] if lines else message)
+        self.showUploadError(message)
+
+    def showUploadError(self, message: str) -> None:
+        """Kept separate so tests can watch for it without a dialog opening."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle("Upload failed")
+        box.setText(message)
+        # The useful part is a path; it needs to be copyable.
+        box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        box.exec()
 
     def onUploadDone(self) -> None:
         if self.uploadWorker is not None:

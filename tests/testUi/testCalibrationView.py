@@ -366,3 +366,30 @@ def testGeneratingRemembersThePathForNextTime(
     viewWithClip.onGenerateSketchClicked()
 
     assert viewWithClip.settingsService.lastSketchPath() == target
+
+
+# An upload failure is several lines, and the line that identifies the cause is
+# the last one. The status bar shows the first line and truncates the rest, so
+# the detail has to reach the user some other way or it may as well not exist.
+uploadFailureText = (
+    "arduino-cli failed:\n"
+    "Error during build: Platform 'arduino:avr' not found: platform not installed\n"
+    "\n"
+    "Using: C:\\Tools\\arduino-cli.exe\n"
+    "Data directory: C:\\Somewhere\\Else\\Arduino15"
+)
+
+
+def testAnUploadFailureIsShownInFullNotJustTheStatusBar(
+    view: CalibrationView, qtbot, monkeypatch
+) -> None:
+    shown: list[str] = []
+    monkeypatch.setattr(view, "showUploadError", shown.append)
+    with qtbot.waitSignal(view.statusMessage) as caught:
+        view.onUploadFailed(uploadFailureText)
+
+    # The whole message reaches the dialog, including the trailing detail.
+    assert shown == [uploadFailureText]
+    assert "Data directory: C:\\Somewhere\\Else\\Arduino15" in shown[0]
+    # The bar gets a readable headline rather than a flattened wall of text.
+    assert caught.args[0] == "arduino-cli failed:"
