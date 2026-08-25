@@ -22,6 +22,13 @@ is off — say so early rather than spending the day fighting it.
   `USE_OVERLAY 1` goes with SYNC SELECT on the two rightmost pins and OUTPUT SELECT on
   Overlay. `USE_OVERLAY 0` goes with pin-9 sync and Sync only.
 - **The Arduino needs 5 V.** Laptop USB is fine; a USB car adapter also works.
+- **A board that uploads cleanly and then answers nothing has the wrong TVout**, not a serial
+  fault. The stock library leaves the input capture interrupt the overlay enables with no
+  handler, so the board resets on every sync pulse and never reads a command. Nothing about the
+  upload looks wrong - it reports a size like any other build. Sketches generated since
+  2026-08-25 refuse to compile against the stock library (`'capture' is not a member of
+  'TVout'`), so this only bites a machine flashing an older sketch. Verify the library rather
+  than the wiring; see the prerequisites below.
 
 ## What is already flashed
 
@@ -68,7 +75,15 @@ Nothing here downloads quickly on campground wifi.
 - `arduino-cli core install arduino:avr`
 - The enhanced TVout: clone <https://github.com/nootropicdesign/arduino-tvout-ve> and copy its
   `TVout`, `TVoutfonts` and `pollserial` folders into `Documents\Arduino\libraries`.
-  The stock TVout will not work.
+  The stock TVout will not work. If a `TVout` folder is already there, delete it first rather
+  than copying over it - a leftover nested `TVout\TVout` is what the desktop ended up with.
+  Confirm which one you have:
+
+  ```powershell
+  Select-String TIMER1_CAPT_vect "$env:USERPROFILE\Documents\Arduino\libraries\TVout\video_gen.cpp"ideo_gen.cpp"
+  ```
+
+  One match is the fork. No match is the stock library, and the board will be silent.
 - **CH340 USB driver** if the Uno is a clone. The desktop's board is genuine and needed none,
   so this is easy to forget.
 - Run `pytest` once to confirm the whole chain works, including the sketch compile test.
