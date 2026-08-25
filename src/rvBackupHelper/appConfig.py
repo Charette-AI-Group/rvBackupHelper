@@ -34,6 +34,20 @@ windowTitle = appName
 defaultWindowWidth = 1000
 defaultWindowHeight = 700
 
+# --- Logging -------------------------------------------------------------
+
+# runApp.cmd launches pythonw, which has no console, so anything written to
+# stdout or stderr is discarded. Without a file the services' log calls go
+# nowhere and a failure at the vehicle leaves no trace to read afterwards.
+# Kept beside the app rather than under AppData so it can be found without
+# knowing where Windows hides things; *.log is already git-ignored.
+logsDir = projectRoot / "logs"
+logPath = logsDir / "rvBackupHelper.log"
+# Small enough to open in a text editor, with a couple of previous runs kept.
+logMaxBytes = 1_000_000
+logBackupCount = 3
+logFormat = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
+
 # --- Video capture -------------------------------------------------------
 
 recordingsDir = projectRoot / "recordings"

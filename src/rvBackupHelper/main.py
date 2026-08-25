@@ -2,15 +2,27 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 
 from PySide6.QtWidgets import QApplication
 
 from rvBackupHelper import appConfig
+from rvBackupHelper.appLogging import configureLogging, installExceptionLogging
 from rvBackupHelper.ui.mainWindow import MainWindow
 
 
 def main() -> int:
+    # Before anything else, so that whatever follows is recorded.
+    logPath = configureLogging()
+    installExceptionLogging()
+    logging.getLogger(__name__).info(
+        "%s %s starting; logging to %s",
+        appConfig.appName,
+        appConfig.appVersion,
+        logPath or "nowhere - the log file could not be opened",
+    )
+
     app = QApplication(sys.argv)
     app.setApplicationName(appConfig.appName)
     app.setApplicationVersion(appConfig.appVersion)
