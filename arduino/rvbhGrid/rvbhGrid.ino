@@ -4,10 +4,10 @@
  * GENERATED FILE - do not edit by hand. Regenerate from the Calibrate tab
  * whenever the calibration changes.
  *
- * Source clip    : rvbh-2026-08-19_09-39-59.mkv (frame 441)
+ * Source clip    : 2026-08-19_09-39-59.mkv (frame 441)
  * Measured on    : 640 x 360 capture
  * Overlay canvas : 136 x 96
- * Generated      : 2026-08-25 14:25
+ * Generated      : 2026-08-25 16:24
  *
  * HARDWARE
  *   Arduino Uno R3 / Duemilanove (ATmega328P) + Nootropic Design Video
