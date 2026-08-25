@@ -176,6 +176,14 @@ width calibration, JSON, generated sketch, flashed Arduino, grid and dashed corr
 display. All of it is driven from the app - **the Arduino IDE is not needed**, uploading goes
 through arduino-cli.
 
+**Before diagnosing an "arduino-cli failed" upload**, read
+`docs/troubleshooting/2026-08-25-laptop-bring-up.md`. Two hours went into one of those on the
+laptop; the cause was simply that `arduino:avr` had never been installed, and the reason it
+took so long is that checks run through the assistant reported a toolchain the machine did not
+have. Confirm the environment from a process *you* start, and note that the app now names the
+binary, the data directory and the cores it can actually see, and keeps a log in
+`logs/rvBackupHelper.log`.
+
 **The camera wiring fault is fixed.** The July footage clipped 3.1% of its pixels at white;
 the August footage clips 0.00%. Judge this by *clipping*, not by the black floor - a sunlit
 asphalt driveway genuinely contains no black, and `tools/measureVideoLevels.py` was itself
