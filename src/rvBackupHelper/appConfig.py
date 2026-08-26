@@ -101,6 +101,17 @@ defaultDistanceFeet = 3.0
 
 # The Arduino IDE requires a sketch to sit in a folder of the same name.
 arduinoDir = projectRoot / "arduino"
+# arduino/ is also handed to arduino-cli as its sketchbook, which is what makes
+# arduino/libraries the library path. The TVout-VE fork is committed there
+# because the stock TVout builds this sketch happily and then leaves the board
+# resetting on every sync pulse - a failure with no useful symptom, and one no
+# check in the repo could catch while the library was a manual copy into
+# Documents\Arduino\libraries.
+arduinoUserDir = arduinoDir
+arduinoLibrariesDir = arduinoUserDir / "libraries"
+# The libraries the sketch cannot build without, used to tell a checkout that
+# is missing them from a toolchain that is merely not installed.
+requiredLibraries = ("TVout", "TVoutfonts", "pollserial")
 sketchName = "rvbhGrid"
 sketchExtension = ".ino"
 

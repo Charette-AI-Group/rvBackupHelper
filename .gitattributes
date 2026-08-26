@@ -1,0 +1,5 @@
+# The vendored TVout-VE tree is upstream's, kept byte-for-byte so that a
+# re-sync from the fork shows only real changes. core.autocrlf would otherwise
+# rewrite every line ending on checkout and make the next robocopy look like a
+# rewrite of the whole library.
+arduino/libraries/** -text

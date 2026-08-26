@@ -154,18 +154,22 @@ them that one test skips itself.
 winget install --id ArduinoSA.CLI --exact
 ```
 
-Then the AVR core and the enhanced TVout library the shield needs — note this is a fork, and
-the stock TVout will not work:
+Then the AVR core, which is a 295 MB download and the reason this section exists at all:
 
 ```powershell
 arduino-cli core install arduino:avr
 ```
 
-Clone <https://github.com/nootropicdesign/arduino-tvout-ve> and copy its `TVout`,
-`TVoutfonts` and `pollserial` folders into `Documents\Arduino\libraries`. To compile a sketch
-by hand:
+**The TVout library the shield needs is already here**, in `arduino/libraries` — the Video
+Experimenter fork, committed rather than installed because the stock TVout compiles this sketch
+perfectly and then leaves the board resetting on every sync pulse. There is nothing to install
+and nothing to get wrong, and whatever sits in `Documents\Arduino\libraries` no longer affects
+the build. See `arduino/libraries/README.md`.
+
+To compile a sketch by hand the way the app does:
 
 ```powershell
+$env:ARDUINO_DIRECTORIES_USER = "$PWD\arduino"
 arduino-cli compile --fqbn arduino:avr:uno arduino/rvbhGrid
 ```
 

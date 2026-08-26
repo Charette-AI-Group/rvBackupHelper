@@ -1,12 +1,19 @@
 """Compiles the generated sketch with the real Arduino toolchain.
 
 The sketch is the artefact that gets flashed to hardware, so "it looks right"
-is not enough. Skipped when arduino-cli or the TVout-VE library is absent, so
-the suite still runs on a machine without the toolchain.
+is not enough. Skipped when arduino-cli or the AVR core is absent, so the
+suite still runs on a machine without the toolchain.
+
+The libraries are not a reason to skip any more: they are committed in
+arduino/libraries and compiled against through ARDUINO_DIRECTORIES_USER, the
+same way the app compiles. That also makes this file test the arrangement it
+relies on - a vendored copy that was wrong or missing fails here instead of
+quietly skipping.
 """
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -14,12 +21,13 @@ from pathlib import Path
 
 import pytest
 
+from rvBackupHelper import appConfig
 from rvBackupHelper.models.calibrationModels import Calibration, CalibrationPoint
+from rvBackupHelper.services.board.uploadService import toolchainEnvironment
 from rvBackupHelper.services.sketch.sketchService import SketchService
 
 fqbn = "arduino:avr:uno"
 installedCliPath = Path(r"C:\Program Files\Arduino CLI\arduino-cli.exe")
-requiredLibraries = ("TVout", "TVoutfonts", "pollserial")
 
 unoSram = 2048
 # Both of these are malloc'd at runtime, so the compiler's "global variables"
@@ -47,16 +55,26 @@ def findArduinoCli() -> str | None:
     return str(installedCliPath) if installedCliPath.exists() else None
 
 
-def librariesInstalled(cli: str) -> bool:
+def avrCoreInstalled(cli: str) -> bool:
+    """The 295 MB half of the toolchain, the half that cannot be committed.
+
+    Checked here rather than left to the compiler, because "platform not
+    installed" in the middle of a failed compile reads as a broken sketch.
+    """
     result = subprocess.run(
-        [cli, "lib", "list"], capture_output=True, text=True, timeout=120
+        [cli, "core", "list"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=toolchainEnvironment(),
     )
-    return all(name in result.stdout for name in requiredLibraries)
+    return "arduino:avr" in result.stdout
 
 
 arduinoCli = findArduinoCli()
 needsToolchain = pytest.mark.skipif(
-    arduinoCli is None, reason="arduino-cli is not installed"
+    arduinoCli is None or not avrCoreInstalled(arduinoCli),
+    reason="the Arduino toolchain is not installed - run tools/setupToolchain.py",
 )
 
 
@@ -70,18 +88,26 @@ def compileSketch(calibration: Calibration, tmp_path: Path) -> subprocess.Comple
         capture_output=True,
         text=True,
         timeout=600,
+        # The libraries in the repo, not whatever the machine happens to have.
+        env=toolchainEnvironment(),
     )
 
 
-def skipWithoutLibraries() -> None:
-    assert arduinoCli is not None
-    if not librariesInstalled(arduinoCli):
-        pytest.skip("the TVout-VE libraries are not installed")
+@needsToolchain
+def testTheCompileUsesTheVendoredLibraries() -> None:
+    """Guards the arrangement the rest of this file depends on."""
+    assert os.environ.get("ARDUINO_DIRECTORIES_USER") != str(appConfig.arduinoUserDir), (
+        "already set outside the process, so this would pass without proving anything"
+    )
+    assert toolchainEnvironment()["ARDUINO_DIRECTORIES_USER"] == str(
+        appConfig.arduinoUserDir
+    )
+    for name in appConfig.requiredLibraries:
+        assert (appConfig.arduinoLibrariesDir / name).is_dir(), f"{name} is not vendored"
 
 
 @needsToolchain
 def testGeneratedSketchCompilesForAnUno(tmp_path: Path) -> None:
-    skipWithoutLibraries()
     calibration = Calibration(
         frameWidth=640,
         frameHeight=480,
@@ -106,7 +132,6 @@ def testGeneratedSketchCompilesForAnUno(tmp_path: Path) -> None:
 @needsToolchain
 def testSketchWithVehicleWidthCompiles(tmp_path: Path) -> None:
     """The dashed-corridor path is a whole extra body of generated C."""
-    skipWithoutLibraries()
     calibration = Calibration(
         frameWidth=640,
         frameHeight=480,

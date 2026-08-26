@@ -30,6 +30,24 @@ def findArduinoCli() -> str | None:
     return str(installed) if installed.exists() else None
 
 
+def toolchainEnvironment() -> dict[str, str]:
+    r"""The environment arduino-cli is run with.
+
+    ARDUINO_DIRECTORIES_USER makes the repo's arduino/ folder the sketchbook,
+    so the libraries committed in arduino/libraries are the ones compiled
+    against and whatever sits in Documents\Arduino\libraries is bypassed
+    entirely - including a stock TVout, which builds this sketch and then
+    leaves the board resetting on every sync pulse.
+
+    The cores are left where the machine already keeps them. They are a 295 MB
+    download, so a repo-local copy would have to be fetched again per checkout;
+    tools/setupToolchain.py installs and verifies those instead.
+    """
+    environment = dict(os.environ)
+    environment["ARDUINO_DIRECTORIES_USER"] = str(appConfig.arduinoUserDir)
+    return environment
+
+
 class UploadService:
     """Runs arduino-cli compile --upload against a sketch folder."""
 
@@ -38,10 +56,12 @@ class UploadService:
         cliFinder=findArduinoCli,
         portFinder=findBoardPort,
         runner=subprocess.run,
+        environmentFactory=toolchainEnvironment,
     ) -> None:
         self.cliFinder = cliFinder
         self.portFinder = portFinder
         self.runner = runner
+        self.environmentFactory = environmentFactory
 
     def upload(self, sketchPath: Path) -> str:
         """Compile and flash the sketch. Returns the size summary on success."""
@@ -58,6 +78,7 @@ class UploadService:
                 "No Arduino found. Check it is plugged in, and that nothing else "
                 "is holding the port."
             )
+        self.checkLibraries()
         sketchDir = self.sketchDirectory(sketchPath)
 
         command = [
@@ -75,6 +96,7 @@ class UploadService:
                 capture_output=True,
                 text=True,
                 timeout=appConfig.uploadTimeoutSeconds,
+                env=self.environmentFactory(),
             )
         except subprocess.TimeoutExpired as exc:
             raise UploadError(f"arduino-cli timed out after {exc.timeout:.0f} s.") from exc
@@ -86,6 +108,26 @@ class UploadService:
                 self.explainFailure(cli, command, result.stdout, result.stderr)
             )
         return self.summarise(result.stdout, port)
+
+    def checkLibraries(self) -> None:
+        """Fail before compiling if the vendored libraries are not there.
+
+        They are committed, so a checkout has them. A zip download of a single
+        folder, or a stray delete, does not - and the compiler's report of that
+        is "TVout.h: No such file or directory", which reads as a machine that
+        needs libraries installed. It does not; it needs the rest of the repo.
+        """
+        missing = [
+            name
+            for name in appConfig.requiredLibraries
+            if not (appConfig.arduinoLibrariesDir / name).is_dir()
+        ]
+        if missing:
+            raise UploadError(
+                f"{', '.join(missing)} missing from {appConfig.arduinoLibrariesDir}. "
+                "These ship with the repository, so this checkout is incomplete - "
+                "'git status' there, or clone again. Installing anything is not the fix."
+            )
 
     def sketchDirectory(self, sketchPath: Path) -> Path:
         """arduino-cli compiles a folder, not a file."""
@@ -221,6 +263,7 @@ class UploadService:
                 capture_output=True,
                 text=True,
                 timeout=appConfig.configQueryTimeoutSeconds,
+                env=self.environmentFactory(),
             )
         except Exception:  # noqa: BLE001 - diagnostics must not mask the real failure
             logger.debug("Could not run arduino-cli %s", " ".join(args), exc_info=True)

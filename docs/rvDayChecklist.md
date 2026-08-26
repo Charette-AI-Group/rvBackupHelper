@@ -24,11 +24,11 @@ is off — say so early rather than spending the day fighting it.
 - **The Arduino needs 5 V.** Laptop USB is fine; a USB car adapter also works.
 - **A board that uploads cleanly and then answers nothing has the wrong TVout**, not a serial
   fault. The stock library leaves the input capture interrupt the overlay enables with no
-  handler, so the board resets on every sync pulse and never reads a command. Nothing about the
-  upload looks wrong - it reports a size like any other build. Sketches generated since
-  2026-08-25 refuse to compile against the stock library (`'capture' is not a member of
-  'TVout'`), so this only bites a machine flashing an older sketch. Verify the library rather
-  than the wiring; see the prerequisites below.
+  handler, so the board resets on every sync pulse and never reads a command, and nothing about
+  the upload looks wrong. Uploading from the app can no longer hit this - it compiles against
+  the copy committed in `arduino/libraries` - so suspect it only after running `arduino-cli` by
+  hand without `ARDUINO_DIRECTORIES_USER` set. The generated sketch refuses to build against the
+  stock library anyway (`'capture' is not a member of 'TVout'`).
 
 ## What is already flashed
 
@@ -73,17 +73,10 @@ Nothing here downloads quickly on campground wifi.
 - Python 3.14+, then `python -m venv .venv` and `pip install -e ".[dev]"` in the repo
 - Arduino CLI: `winget install --id ArduinoSA.CLI --exact`
 - `arduino-cli core install arduino:avr`
-- The enhanced TVout: clone <https://github.com/nootropicdesign/arduino-tvout-ve> and copy its
-  `TVout`, `TVoutfonts` and `pollserial` folders into `Documents\Arduino\libraries`.
-  The stock TVout will not work. If a `TVout` folder is already there, delete it first rather
-  than copying over it - a leftover nested `TVout\TVout` is what the desktop ended up with.
-  Confirm which one you have:
-
-  ```powershell
-  Select-String TIMER1_CAPT_vect "$env:USERPROFILE\Documents\Arduino\libraries\TVout\video_gen.cpp"
-  ```
-
-  One match is the fork. No match is the stock library, and the board will be silent.
+- **TVout: nothing to do.** The Video Experimenter fork is committed at `arduino/libraries`,
+  and the app and the tests both compile against that copy, so a clone has it and
+  `Documents\Arduino\libraries` is not consulted at all. This used to be the step most likely
+  to go wrong.
 - **CH340 USB driver** if the Uno is a clone. The desktop's board is genuine and needed none,
   so this is easy to forget.
 - Run `pytest` once to confirm the whole chain works, including the sketch compile test.

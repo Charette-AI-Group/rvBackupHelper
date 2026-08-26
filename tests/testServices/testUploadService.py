@@ -24,9 +24,11 @@ class FakeRunner:
         self.stdout = stdout
         self.stderr = stderr
         self.command: list[str] | None = None
+        self.environment: dict[str, str] | None = None
 
     def __call__(self, command, **kwargs):
         self.command = command
+        self.environment = kwargs.get("env")
         return subprocess.CompletedProcess(command, self.returncode, self.stdout, self.stderr)
 
 
@@ -60,6 +62,47 @@ def testUploadRunsCompileWithUploadAndVerify(sketchDir: Path) -> None:
     assert runner.command[-1] == str(sketchDir)
     assert "Sketch uses 8342 bytes" in summary
     assert "COM3" in summary
+
+
+def testCompilingUsesTheLibrariesInTheRepo(sketchDir: Path) -> None:
+    r"""Whatever is in Documents\Arduino\libraries must not decide the build.
+
+    A stock TVout there compiles this sketch and leaves the board resetting on
+    every sync pulse, so the vendored copy has to win without depending on the
+    machine being tidy.
+    """
+    runner = FakeRunner()
+
+    serviceWith(runner).upload(sketchDir / "rvbhGrid.ino")
+
+    assert runner.environment is not None
+    assert runner.environment["ARDUINO_DIRECTORIES_USER"] == str(appConfig.arduinoUserDir)
+    assert (appConfig.arduinoLibrariesDir / "TVout" / "video_gen.cpp").exists()
+
+
+def testTheVendoredLibrariesAreTheVideoExperimenterFork() -> None:
+    """The stock library is the one failure this whole arrangement exists to stop.
+
+    It differs where it matters by defining no handler for the input capture
+    interrupt, which is the one the overlay enables.
+    """
+    source = (appConfig.arduinoLibrariesDir / "TVout" / "video_gen.cpp").read_text(
+        encoding="utf-8", errors="replace"
+    )
+
+    assert "ISR(TIMER1_CAPT_vect)" in source
+
+
+def testAnIncompleteCheckoutIsNotMistakenForAMissingToolchain(
+    sketchDir: Path, monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(appConfig, "arduinoLibrariesDir", tmp_path / "libraries")
+    runner = FakeRunner()
+
+    with pytest.raises(UploadError, match="checkout is incomplete"):
+        serviceWith(runner).upload(sketchDir / "rvbhGrid.ino")
+
+    assert runner.command is None, "nothing should be compiled with libraries missing"
 
 
 def testAFolderMayBeGivenInsteadOfAFile(sketchDir: Path) -> None:
