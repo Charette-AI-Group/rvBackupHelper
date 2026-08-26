@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
 )
 
 from rvBackupHelper import appConfig
+from rvBackupHelper.services.board.toolchainService import ToolchainReport
+from rvBackupHelper.services.board.toolchainWorker import ToolchainWorker
 from rvBackupHelper.services.manual.manualWorker import ManualWorker
 from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.ui.calibration.calibrationView import CalibrationView
@@ -38,6 +40,7 @@ class MainWindow(QMainWindow):
         self.resize(appConfig.defaultWindowWidth, appConfig.defaultWindowHeight)
         self.settingsService = settingsService or SettingsService()
         self.manualWorker: ManualWorker | None = None
+        self.toolchainWorker: ToolchainWorker | None = None
 
         self.captureView = CaptureView()
         # Calibrate embeds the same clip browser a separate Review tab would
@@ -87,6 +90,14 @@ class MainWindow(QMainWindow):
         fileMenu.addAction(self.exitAction)
 
         helpMenu = self.helpMenu = self.menuBar().addMenu("&Help")
+
+        # First in the menu because it is what you reach for when something is
+        # wrong, and everything else here is reading rather than diagnosing.
+        self.toolchainAction = QAction("Check &Toolchain...", self)
+        self.toolchainAction.triggered.connect(self.onCheckToolchain)
+        helpMenu.addAction(self.toolchainAction)
+
+        helpMenu.addSeparator()
 
         self.manualAction = QAction("User &Manual...", self)
         self.manualAction.setShortcut(QKeySequence.StandardKey.HelpContents)  # F1
@@ -184,6 +195,48 @@ class MainWindow(QMainWindow):
             self.manualWorker = None
         self.manualAction.setEnabled(True)
 
+    def onCheckToolchain(self) -> None:
+        """Compile something, and report what the compiler used.
+
+        Answers the question before an upload does, and answers it with a build
+        rather than with a directory listing - which is the distinction that
+        cost a working day when a missing core was reported as present by
+        everything that was not the compiler.
+        """
+        if self.toolchainWorker is not None:
+            return
+        self.toolchainAction.setEnabled(False)
+        self.showStatus("Checking the toolchain - compiling a sketch...")
+        worker = ToolchainWorker(parent=self)
+        worker.checked.connect(self.onToolchainChecked)
+        worker.finished.connect(self.onToolchainCheckFinished)
+        self.toolchainWorker = worker
+        worker.start()
+
+    def onToolchainChecked(self, report: ToolchainReport) -> None:
+        self.showStatus(report.headline)
+        self.showToolchainReport(report)
+
+    def showToolchainReport(self, report: ToolchainReport) -> None:
+        """Kept separate so tests can watch for it without a dialog opening."""
+        box = QMessageBox(self)
+        box.setIcon(
+            QMessageBox.Icon.Information if report.ok else QMessageBox.Icon.Warning
+        )
+        box.setWindowTitle("Toolchain")
+        box.setText(report.headline)
+        # Paths and a compiler's own words: worth reading in full, and worth
+        # being able to copy into a message to somebody else.
+        box.setInformativeText(report.details)
+        box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        box.exec()
+
+    def onToolchainCheckFinished(self) -> None:
+        if self.toolchainWorker is not None:
+            self.toolchainWorker.deleteLater()
+            self.toolchainWorker = None
+        self.toolchainAction.setEnabled(True)
+
     def onHelpAbout(self) -> None:
         if showAbout(self):
             self.showStatus("Thank you - the donation page is opening in your browser.")
@@ -191,6 +244,10 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event: QCloseEvent) -> None:
         if self.manualWorker is not None:
             self.manualWorker.wait(int(appConfig.manualTimeoutSeconds * 1000) + 1000)
+        if self.toolchainWorker is not None:
+            # A compile in flight; it is short, and leaving the thread running
+            # into interpreter shutdown is how a clean exit turns into a crash.
+            self.toolchainWorker.wait(int(appConfig.uploadTimeoutSeconds * 1000))
         self.captureView.shutdown()
         self.calibrationView.shutdown()
         super().closeEvent(event)

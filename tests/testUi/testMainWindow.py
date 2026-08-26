@@ -10,6 +10,10 @@ from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QFileDialog
 
 from rvBackupHelper import appConfig
+from rvBackupHelper.services.board.toolchainService import (
+    ToolchainReport,
+    ToolchainService,
+)
 from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.ui.mainWindow import MainWindow
 
@@ -52,8 +56,10 @@ def testMenuBarStructure(qtbot) -> None:
     assert fileItems == ["&Open Clip...", "&Recordings Folder...", "E&xit"]
     assert any(a.isSeparator() for a in mainWindow.fileMenu.actions())
 
-    helpItems = [a.text() for a in mainWindow.helpMenu.actions()]
-    assert helpItems == ["User &Manual...", "&About"]
+    helpItems = [a.text() for a in mainWindow.helpMenu.actions() if not a.isSeparator()]
+    # Check Toolchain first: it is what you reach for when something is wrong.
+    assert helpItems == ["Check &Toolchain...", "User &Manual...", "&About"]
+    assert any(a.isSeparator() for a in mainWindow.helpMenu.actions())
 
 
 def testViewStatusMessagesReachTheStatusBar(qtbot) -> None:
@@ -245,6 +251,49 @@ def testTheCheckRunsOffTheInterfaceThread(qtbot, monkeypatch) -> None:
     mainWindow.manualWorker.wait(5000)
     qtbot.waitUntil(lambda: mainWindow.manualWorker is None, timeout=5000)
     assert mainWindow.manualAction.isEnabled()
+
+
+def testCheckingTheToolchainRunsOffTheInterfaceThread(qtbot, monkeypatch) -> None:
+    """It compiles a sketch, which is seconds of frozen window otherwise."""
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    report = ToolchainReport(ok=True, headline="Ready.", details="arduino-cli: somewhere")
+    monkeypatch.setattr(ToolchainService, "check", lambda self: report)
+    monkeypatch.setattr(MainWindow, "showToolchainReport", lambda self, report: None)
+
+    with qtbot.waitSignal(mainWindow.toolchainAction.changed, timeout=5000):
+        mainWindow.onCheckToolchain()
+    # Disabled while the compile is in flight, so it cannot be started twice.
+    assert not mainWindow.toolchainAction.isEnabled()
+
+    assert mainWindow.toolchainWorker is not None
+    mainWindow.toolchainWorker.wait(5000)
+    qtbot.waitUntil(lambda: mainWindow.toolchainWorker is None, timeout=5000)
+    assert mainWindow.toolchainAction.isEnabled()
+
+
+def testTheVerdictReachesBothTheStatusBarAndADialog(qtbot, monkeypatch) -> None:
+    """The status bar shows one line and truncates it; the detail has to have
+
+    somewhere else to go, because the part that identifies the wrong directory
+    is exactly the part a one-line bar drops.
+    """
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    report = ToolchainReport(
+        ok=False,
+        headline="The toolchain is not ready.",
+        details=r"data dir: C:\elsewhere",
+    )
+    shown: list[ToolchainReport] = []
+    monkeypatch.setattr(
+        MainWindow, "showToolchainReport", lambda self, report: shown.append(report)
+    )
+
+    mainWindow.onToolchainChecked(report)
+
+    assert mainWindow.statusBar().currentMessage() == "The toolchain is not ready."
+    assert shown == [report]
 
 
 def testManualHasTheStandardHelpShortcut(qtbot) -> None:

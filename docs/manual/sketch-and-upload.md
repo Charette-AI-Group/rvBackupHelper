@@ -69,6 +69,22 @@ Uploaded to COM3. Sketch uses 7978 bytes (24%) of program storage space.
 If `arduino-cli` is not installed the button says so and points you at the IDE
 instead. If no board is plugged in it says that.
 
+### Checking before you need it
+
+**Help → Check Toolchain** answers "will this machine be able to flash the
+board?" without a board attached. It compiles a sketch — the generated one if
+there is one, the bring-up sketch otherwise — and reports which `arduino-cli`,
+which data directory and which libraries were used:
+
+```
+Ready. Sketch uses 8374 bytes (25%) of program storage space.
+```
+
+The compile is the point. A missing AVR core once cost a working day because
+every check short of building something insisted it was installed. This one
+installs nothing; when something is absent it names
+`tools\setupToolchain.py`, which does.
+
 The button offers **the last sketch you generated**, remembered between
 sessions — so a sketch saved as `rvbhGridV2` is still what Upload flashes after
 a restart. Hover the button to see which one it will use. If that file has since

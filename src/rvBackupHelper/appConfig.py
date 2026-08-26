@@ -113,6 +113,10 @@ arduinoLibrariesDir = arduinoUserDir / "libraries"
 # is missing them from a toolchain that is merely not installed.
 requiredLibraries = ("TVout", "TVoutfonts", "pollserial")
 sketchName = "rvbhGrid"
+# The hand-written diagnostic sketch, used to check the toolchain before any
+# calibration exists to generate from. It needs the same core and the same
+# libraries, so compiling it proves the same things.
+bringUpSketchName = "rvbhBringUp"
 sketchExtension = ".ino"
 
 # Distances drawn with a heavier line, in feet. The overlay is one bit per
