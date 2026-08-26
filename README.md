@@ -190,6 +190,32 @@ pytest
 ruff check src tests
 ```
 
+## Building a standalone application
+
+Not needed to use the app from a checkout. This is for handing it to somebody who has no
+Python.
+
+```powershell
+.venv\Scripts\python.exe -m pip install -e ".[build]"
+.venv\Scripts\python.exe tools\buildExe.py --smoke
+```
+
+That produces `dist\rvBackupHelper\` — about **257 MB**, of which the executable itself is 5 MB
+and the rest is PySide6 and OpenCV. A one-folder build rather than one-file, so it starts
+immediately instead of unpacking itself on every launch, and so the sketches stay browsable
+where they land.
+
+`buildExe.py` then takes an inventory of the bundle, because PyInstaller will happily succeed
+while leaving a data file out and the symptom only appears later as a missing manual or a
+compile that cannot find `TVout.h`. It fails the build if anything expected is absent, or if
+anything that belongs to a user — `arduino/rvbhGrid`, `recordings/`, `calibration/` — has
+crept in. `--smoke` also launches the result and confirms it logged a startup, which for a
+windowed build with no console is the only proof available.
+
+An installed build reads its manual, libraries and bring-up sketch from the bundle, and writes
+everything else under `%LOCALAPPDATA%\RV Backup Helper` — created and seeded on first run, and
+named as a link in Help > About.
+
 ## Arduino toolchain
 
 Installed by `tools\setupToolchain.py` in the one-time setup above; this is what it does and

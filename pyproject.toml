@@ -21,6 +21,11 @@ dev = [
     "pytest-qt>=4.4,<5",
     "ruff>=0.4,<1",
 ]
+# Only needed to produce a standalone build; see tools/buildExe.py. Kept out
+# of dev so a checkout that only runs the app and the tests stays smaller.
+build = [
+    "pyinstaller>=6.16,<7",
+]
 
 [project.scripts]
 rv-backup-helper = "rvBackupHelper.main:main"
