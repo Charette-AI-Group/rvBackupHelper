@@ -134,8 +134,13 @@ Derived from the vendored library source rather than measured on the bench.
 buffer is actually rewritten, and `setGridVisible()` answers before it redraws rather than
 after — with no video that redraw costs about a second, which is most of the host's patience.
 Nothing about the picture changes: the redraw still starts at a frame boundary, which is the
-only reason the wait existed. **The prediction to check on hardware** is that the grid toggle
-now answers with no video going into the shield, where before it mostly did not.
+only reason the wait existed.
+
+**Confirmed on hardware.** The grid toggle answers with nothing feeding the shield's V INPUT,
+where before it did not. The first attempt appeared to disprove it and had simply been run
+against a board still holding the previous sketch — worth remembering, because "the fix does
+not work" and "the fix is not on the board" look identical from the application. The board's
+own size report is the cheap way to tell them apart: this build is **8350 bytes (25%)**.
 
 **Washed-out composite with no colour is a bad RCA contact, not an overexposed source.**
 Measured on the bench VHS feed before and after reseating the plug:
@@ -179,9 +184,10 @@ The TVout libraries were real all along; only the core was missing.
 
 ## Open items
 
-- **The board's flash state is unknown.** The uploads reported during this session ran through
-  the same unreliable view, so do not assume `rvbhGrid` is on it. Re-flash and confirm by
-  asking the board `?` with video going into the shield.
+- ~~**The board's flash state is unknown.**~~ **Closed.** Re-flashed and confirmed: the board
+  runs `rvbhGrid` at 8350 bytes and answers the grid toggle, with and without video going into
+  the shield. It had indeed been holding an older sketch, which is what made the first test of
+  the loop() fix look like a failure.
 - ~~`arduino/rvbhGrid/rvbhGrid.ino` lost the `rvbh-` prefix from its header source clip.~~
   **Closed, not a defect.** `calibration/260819rvbhCalibration.json` records
   `sourceClip: "2026-08-19_09-39-59.mkv"` — OBS's own naming, since that clip was not recorded
