@@ -15,3 +15,7 @@ venv/
 
 # Captured video — large, and regenerated at the RV rather than shared.
 recordings/
+
+# Where tools/setupToolchain.py --data-dir puts the AVR core if you ask it to
+# keep the toolchain inside the checkout. 295 MB of downloaded compiler.
+arduino/.toolchain/

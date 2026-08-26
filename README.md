@@ -148,15 +148,25 @@ ruff check src tests
 ## Arduino toolchain (optional, for checking generated sketches)
 
 With these installed, the test suite compiles the generated sketch for a real Uno; without
-them that one test skips itself.
+them that one test skips itself. One command does the lot:
+
+```powershell
+.venv\Scripts\python.exe tools\setupToolchain.py
+```
+
+It installs `arduino-cli` through winget if it is missing, fetches the AVR core (a 295 MB
+download, the reason this section exists at all) if that is missing, and then **compiles the
+real sketch** and prints which binary, data directory and libraries it used. That last part is
+the point: a pass is evidence about this machine, not about a folder somebody looked at once.
+
+`--check` reports without installing anything. `--data-dir arduino\.toolchain` keeps the cores
+inside the checkout rather than the machine-wide `Arduino15` folder, which isolates this repo
+completely at the cost of that 295 MB per checkout.
+
+By hand, if you would rather:
 
 ```powershell
 winget install --id ArduinoSA.CLI --exact
-```
-
-Then the AVR core, which is a 295 MB download and the reason this section exists at all:
-
-```powershell
 arduino-cli core install arduino:avr
 ```
 

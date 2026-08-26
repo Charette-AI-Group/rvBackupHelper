@@ -71,8 +71,16 @@ the overlay lands on the real rear view before trusting any measured line.
 Nothing here downloads quickly on campground wifi.
 
 - Python 3.14+, then `python -m venv .venv` and `pip install -e ".[dev]"` in the repo
-- Arduino CLI: `winget install --id ArduinoSA.CLI --exact`
-- `arduino-cli core install arduino:avr`
+- The Arduino toolchain, in one command — it installs `arduino-cli` and the 295 MB AVR core if
+  they are missing, then compiles the real sketch and prints what it used:
+
+  ```powershell
+  .venv\Scripts\python.exe tools\setupToolchain.py
+  ```
+
+  Do not accept anything less than its own final line as proof. A core reported present by a
+  check run somewhere else is what cost two hours on 2026-08-25; see
+  `docs/troubleshooting/2026-08-25-laptop-bring-up.md`.
 - **TVout: nothing to do.** The Video Experimenter fork is committed at `arduino/libraries`,
   and the app and the tests both compile against that copy, so a clone has it and
   `Documents\Arduino\libraries` is not consulted at all. This used to be the step most likely
