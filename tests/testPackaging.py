@@ -48,3 +48,41 @@ def testTheGeneratedSketchIsNotShipped() -> None:
 def testNoConsoleWindowIsAttached() -> None:
     """It logs to a file precisely because it has never had a console."""
     assert "console=False" in specText
+
+
+installerText = (
+    appConfig.projectRoot / "installer" / "rvBackupHelper.iss"
+).read_text(encoding="utf-8")
+
+
+def testTheInstallerShipsWhatTheBuildProduces() -> None:
+    assert "dist\\rvBackupHelper" in installerText
+    assert "rvBackupHelper.exe" in installerText
+
+
+def testTheInstallerAsksAboutHardwareBeforeInstallingAnything() -> None:
+    """The whole point of the ordering: five seconds, not 295 MB, to find out."""
+    assert "checkHardware.ps1" in installerText
+    assert "dontcopy" in installerText, "the check must run before files are laid down"
+    assert "wpWelcome" in installerText, "the hardware page belongs at the front"
+
+
+def testTheExpensiveDownloadIsOptionalAndLast() -> None:
+    assert "avrcore" in installerText
+    assert "295 MB" in installerText
+
+
+def testMissingHardwareDoesNotBlockTheInstall() -> None:
+    """Calibrating and generating need no hardware; refusing would be a lie."""
+    assert "MB_YESNO" in installerText
+
+
+def testTheInstalledAdviceDoesNotPointAtAToolThatIsNotThere(monkeypatch) -> None:
+    """A frozen build has no Python and no tools folder."""
+    from rvBackupHelper.services.board.toolchainService import setupAdvice
+
+    monkeypatch.setattr(appConfig, "frozen", True)
+    advice = setupAdvice()
+
+    assert "setupToolchain.py" not in advice
+    assert "arduino-cli core install arduino:avr" in advice

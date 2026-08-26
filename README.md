@@ -216,6 +216,28 @@ An installed build reads its manual, libraries and bring-up sketch from the bund
 everything else under `%LOCALAPPDATA%\RV Backup Helper` — created and seeded on first run, and
 named as a link in Help > About.
 
+### Making an installer
+
+`installer\rvBackupHelper.iss` builds a single setup executable with
+[Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install --id JRSoftware.InnoSetup`):
+
+```powershell
+ISCC.exe installer\rvBackupHelper.iss
+```
+
+The wizard is ordered so everything cheap happens before anything expensive:
+
+1. **Hardware check**, on the page after Welcome, before a single file is written. It extracts
+   `checkHardware.ps1` to a temporary folder and runs it, so somebody with no grabber finds out
+   in five seconds rather than after a 295 MB download. There is a **Check again** button for
+   plugging things in without restarting the wizard.
+2. **The application**, per-user, so no UAC prompt and no Program Files.
+3. **`arduino-cli`**, via winget, only if it is not already there.
+4. **The AVR core**, last, as a **tick box** — 295 MB, and only uploading needs it.
+
+Missing hardware warns and asks; it does not block. Calibrating footage and generating a sketch
+need no board and no grabber, so refusing to install would turn a warning into a lie.
+
 ## Arduino toolchain
 
 Installed by `tools\setupToolchain.py` in the one-time setup above; this is what it does and

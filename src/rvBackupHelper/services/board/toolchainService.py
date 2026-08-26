@@ -24,7 +24,20 @@ from rvBackupHelper.services.board.uploadService import (
 
 logger = logging.getLogger(__name__)
 
-setupCommand = r".venv\Scripts\python.exe tools\setupToolchain.py"
+def setupAdvice() -> str:
+    r"""How to install the missing half, for whoever is actually reading it.
+
+    An installed build has no Python and no tools folder, so pointing it at
+    setupToolchain.py would be advice nobody there could follow. The answer is
+    the installer, or arduino-cli itself.
+    """
+    core = appConfig.boardFqbn.rsplit(":", 1)[0]
+    if appConfig.frozen:
+        return (
+            "    Run the installer again and tick the Arduino toolchain "
+            f"option,\n    or from a terminal: arduino-cli core install {core}"
+        )
+    return r"    .venv\Scripts\python.exe tools\setupToolchain.py"
 
 
 @dataclass(frozen=True)
@@ -74,7 +87,7 @@ class ToolchainService:
                 headline="arduino-cli was not found.",
                 details=(
                     "Nothing can be compiled or flashed without it.\n\n"
-                    f"Install it and the AVR core with:\n    {setupCommand}\n\n"
+                    f"Install it and the AVR core with:\n{setupAdvice()}\n\n"
                     "or by hand:\n"
                     "    winget install --id ArduinoSA.CLI --exact\n"
                     f"    arduino-cli core install {self.coreName()}"
@@ -190,6 +203,6 @@ class ToolchainService:
                 lines.append("")
                 lines.append(
                     f"The {self.coreName()} core is missing from the directory above. "
-                    f"Install it with:\n    {setupCommand}"
+                    f"Install it with:\n{setupAdvice()}"
                 )
         return "\n".join(lines)
