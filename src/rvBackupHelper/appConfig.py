@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 
 appName = "RV Backup Helper"
@@ -28,7 +30,31 @@ donateTextColour = "#1f1e1b"
 donatePressedColour = "#d9991f"
 
 projectRoot = Path(__file__).resolve().parents[2]
-manualPath = projectRoot / "docs" / "manual" / "README.md"
+
+# --- Where things live ---------------------------------------------------
+#
+# Two roots, because an installed copy cannot write where it was installed.
+#
+#   programRoot  - read-only: the manual, the hardware check, the vendored
+#                  TVout libraries and the bring-up sketch.
+#   userDataDir  - written to: logs, recordings, calibrations, and the
+#                  generated sketches the application produces.
+#
+# Run from a checkout they are the same folder, so a clone behaves exactly as
+# it always has and recordings/ and calibration/ stay where the RV checklist
+# says they are. Only a frozen build splits them, and only then does anything
+# need seeding into place - see services/userDataService.py.
+frozen = bool(getattr(sys, "frozen", False))
+if frozen:
+    # PyInstaller unpacks a one-file build into _MEIPASS; a one-folder build
+    # sits beside the executable.
+    programRoot = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    userDataDir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / appName
+else:
+    programRoot = projectRoot
+    userDataDir = projectRoot
+
+manualPath = programRoot / "docs" / "manual" / "README.md"
 resourcesDir = Path(__file__).resolve().parent / "resources"
 windowTitle = appName
 defaultWindowWidth = 1000
@@ -40,8 +66,10 @@ defaultWindowHeight = 700
 # stdout or stderr is discarded. Without a file the services' log calls go
 # nowhere and a failure at the vehicle leaves no trace to read afterwards.
 # Kept beside the app rather than under AppData so it can be found without
-# knowing where Windows hides things; *.log is already git-ignored.
-logsDir = projectRoot / "logs"
+# knowing where Windows hides things; *.log is already git-ignored. An
+# installed build has no writable folder beside it, so there it does live
+# under AppData - with userDataDir named in the About box so it can be found.
+logsDir = userDataDir / "logs"
 logPath = logsDir / "rvBackupHelper.log"
 # Small enough to open in a text editor, with a couple of previous runs kept.
 logMaxBytes = 1_000_000
@@ -50,7 +78,7 @@ logFormat = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
 
 # --- Video capture -------------------------------------------------------
 
-recordingsDir = projectRoot / "recordings"
+recordingsDir = userDataDir / "recordings"
 
 defaultDeviceIndex = 0
 defaultFrameWidth = 640
@@ -81,7 +109,7 @@ recordingExtension = ".avi"
 
 # Small JSON, and the one artefact that can only be produced at the RV, so it
 # is version controlled rather than ignored the way recordings are.
-calibrationDir = projectRoot / "calibration"
+calibrationDir = userDataDir / "calibration"
 calibrationExtension = ".json"
 defaultCalibrationName = f"rvbhCalibration{calibrationExtension}"
 
@@ -100,7 +128,12 @@ defaultDistanceFeet = 3.0
 # --- Arduino sketch ------------------------------------------------------
 
 # The Arduino IDE requires a sketch to sit in a folder of the same name.
-arduinoDir = projectRoot / "arduino"
+# Written to, not only read: Generate Arduino Sketch puts its output here, and
+# arduino-cli compiles in place, so this cannot be a read-only install folder.
+arduinoDir = userDataDir / "arduino"
+# The copy that ships with the application, and the source the writable one is
+# seeded from on first run of an installed build. The same folder in a clone.
+bundledArduinoDir = programRoot / "arduino"
 # arduino/ is also handed to arduino-cli as its sketchbook, which is what makes
 # arduino/libraries the library path. The TVout-VE fork is committed there
 # because the stock TVout builds this sketch happily and then leaves the board
@@ -152,7 +185,7 @@ boardVendorIds = (0x2341, 0x2A03, 0x1A86)
 # here, because an installer has to be able to ask it before Python exists on
 # the machine - and one script means the app and the installer cannot give two
 # different answers. See tools/checkHardware.ps1.
-hardwareCheckScript = projectRoot / "tools" / "checkHardware.ps1"
+hardwareCheckScript = programRoot / "tools" / "checkHardware.ps1"
 # Windows PowerShell 5.1, which ships with Windows; not pwsh, which does not.
 powerShellExecutable = "powershell"
 # Starting PowerShell and walking the USB tree, with room for a slow machine.

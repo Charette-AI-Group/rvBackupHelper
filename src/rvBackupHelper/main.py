@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 from rvBackupHelper import appConfig
 from rvBackupHelper.appLogging import configureLogging, installExceptionLogging
+from rvBackupHelper.services.userDataService import ensureUserData
 from rvBackupHelper.ui.mainWindow import MainWindow
 
 
@@ -22,6 +23,10 @@ def main() -> int:
         appConfig.appVersion,
         logPath or "nowhere - the log file could not be opened",
     )
+    # After logging, so that what it does is recorded, and before the window,
+    # so the folders exist by the time anything asks for them.
+    for created in ensureUserData():
+        logging.getLogger(__name__).info("Created %s", created)
 
     app = QApplication(sys.argv)
     app.setApplicationName(appConfig.appName)

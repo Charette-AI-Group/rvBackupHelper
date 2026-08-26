@@ -18,6 +18,14 @@ def testAboutTextCarriesTheCredits() -> None:
     assert appConfig.repoUrl in text
 
 
+def testAboutTextSaysWhereTheUsersFilesAre() -> None:
+    """Obvious in a checkout; unguessable once installed under AppData."""
+    text = aboutHtml(year=2026)
+
+    assert str(appConfig.userDataDir) in text
+    assert appConfig.userDataDir.as_uri() in text
+
+
 def testDialogStartsWithNoDonationRequested(qtbot) -> None:
     dialog = AboutDialog()
     qtbot.addWidget(dialog)

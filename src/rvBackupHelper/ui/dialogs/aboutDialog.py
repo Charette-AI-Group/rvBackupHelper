@@ -51,6 +51,11 @@ def aboutHtml(year: int | None = None) -> str:
         f"<p>Editor: {appConfig.editorName}<br>"
         f"AI Agent: {appConfig.aiAgentName}</p>"
         f'<p>Source at <a href="{appConfig.repoUrl}">rvBackupHelper</a>.</p>'
+        # Where the recordings, calibrations and logs actually are. Obvious in a
+        # checkout, and impossible to guess in an installed build, where it is
+        # a folder under AppData that nobody would think to look in.
+        f'<p>Your files: <a href="{appConfig.userDataDir.as_uri()}">'
+        f"{appConfig.userDataDir}</a></p>"
         f"<p>&copy; {year} {appConfig.copyrightHolder}</p>"
     )
 
