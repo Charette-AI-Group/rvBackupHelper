@@ -30,8 +30,11 @@ class ManualService:
         answer.
         """
         target = url or appConfig.manualUrl
-        request = urllib.request.Request(target, method="HEAD")
         try:
+            # Built inside the try: Request() itself rejects a URL with no
+            # scheme, and this runs on a worker thread where an escaping
+            # exception is a crash rather than a fallback to the local copy.
+            request = urllib.request.Request(target, method="HEAD")
             with self.opener(request, timeout=appConfig.manualTimeoutSeconds) as reply:
                 # Some openers answer without a status; treat that as success.
                 status = getattr(reply, "status", 200) or 200

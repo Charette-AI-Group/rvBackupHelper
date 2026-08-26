@@ -73,6 +73,16 @@ def testATimeoutIsNotAvailable() -> None:
 
 
 def testAMalformedUrlIsNotAvailable() -> None:
+    """A real malformed URL, not a faked raise from the opener.
+
+    Request() rejects a URL with no scheme before any opener is called, so
+    faking it here passed while the real path raised straight out of the
+    worker thread. This case has to be built rather than mocked.
+    """
+    assert not ManualService(openerReturning(200)).isOnlineCopyAvailable("not-a-url")
+
+
+def testAnOpenerRaisingAValueErrorIsAlsoJustAnAnswer() -> None:
     assert not ManualService(openerRaising(ValueError("unknown url type"))).isOnlineCopyAvailable()
 
 
