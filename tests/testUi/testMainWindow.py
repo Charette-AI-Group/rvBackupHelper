@@ -253,6 +253,46 @@ def testTheCheckRunsOffTheInterfaceThread(qtbot, monkeypatch) -> None:
     assert mainWindow.manualAction.isEnabled()
 
 
+def testAViewFailureOpensADialogAndKeepsTheBarShort(qtbot, monkeypatch) -> None:
+    """The bar is for status. A failure that only fits half-way into it reads
+
+    as the whole failure, which is how a diagnosis got lost twice.
+    """
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    shown: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        MainWindow, "showError", lambda self, title, message: shown.append((title, message))
+    )
+    message = (
+        "The board did not answer. Something long enough that the status bar "
+        "would otherwise cut it off part of the way through a word, hiding the "
+        "part that says what to do about it."
+    )
+
+    mainWindow.captureView.reportError("Arduino", message)
+
+    assert shown == [("Arduino", message)]
+    assert mainWindow.statusBar().currentMessage() == "The board did not answer."
+
+
+def testBothTabsReportFailuresTheSameWay(qtbot, monkeypatch) -> None:
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    shown: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        MainWindow, "showError", lambda self, title, message: shown.append((title, message))
+    )
+
+    mainWindow.captureView.reportError("Capture failed", "the device went away")
+    mainWindow.calibrationView.reportError("Upload failed", "the board went away")
+
+    assert shown == [
+        ("Capture failed", "the device went away"),
+        ("Upload failed", "the board went away"),
+    ]
+
+
 def testCheckingTheToolchainRunsOffTheInterfaceThread(qtbot, monkeypatch) -> None:
     """It compiles a sketch, which is seconds of frozen window otherwise."""
     mainWindow = MainWindow()

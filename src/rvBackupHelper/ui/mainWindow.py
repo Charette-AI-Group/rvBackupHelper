@@ -28,6 +28,7 @@ from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.ui.calibration.calibrationView import CalibrationView
 from rvBackupHelper.ui.capture.captureView import CaptureView
 from rvBackupHelper.ui.dialogs.aboutDialog import showAbout
+from rvBackupHelper.ui.dialogs.errorDialog import showError
 
 # Pixel budget for the status-bar path before it is elided in the middle.
 recordingsLabelWidth = 420
@@ -54,6 +55,11 @@ class MainWindow(QMainWindow):
 
         self.captureView.statusMessage.connect(self.showStatus)
         self.calibrationView.statusMessage.connect(self.showStatus)
+        # Failures go to a dialog. The bar is for status, and a status bar that
+        # sometimes carries a truncated failure is worse than one that never
+        # carries failures at all: it looks like the whole message.
+        self.captureView.errorMessage.connect(self.showError)
+        self.calibrationView.errorMessage.connect(self.showError)
         self.captureView.clipRecorded.connect(self.onClipRecorded)
 
         self.buildMenuBar()
@@ -107,6 +113,10 @@ class MainWindow(QMainWindow):
         self.aboutAction = QAction("&About", self)
         self.aboutAction.triggered.connect(self.onHelpAbout)
         helpMenu.addAction(self.aboutAction)
+
+    def showError(self, title: str, message: str) -> None:
+        """Kept a method so tests can watch for it without a dialog opening."""
+        showError(self, title, message)
 
     def showStatus(self, message: str) -> None:
         self.statusBar().showMessage(message)

@@ -200,7 +200,9 @@ def testAFailedGridCommandPutsTheButtonBack(qtbot) -> None:
     view = CaptureView()
     qtbot.addWidget(view)
     messages: list[str] = []
+    errors: list[tuple[str, str]] = []
     view.statusMessage.connect(messages.append)
+    view.errorMessage.connect(lambda title, message: errors.append((title, message)))
     view.gridToggle.setChecked(False)
 
     view.onGridFailed("No Arduino found.")
@@ -208,6 +210,27 @@ def testAFailedGridCommandPutsTheButtonBack(qtbot) -> None:
     assert view.gridToggle.isChecked()
     assert view.gridToggle.text() == gridOnText
     assert "No Arduino found." in messages[-1]
+    # And in full, where it can be read whatever its length.
+    assert errors == [("Arduino", "No Arduino found.")]
+
+
+def testALongBoardFailureIsNotLeftHalfSaidOnTheBar(qtbot) -> None:
+    """This is the actual message that got cut at "the Video Experimenter fc"."""
+    view = CaptureView()
+    qtbot.addWidget(view)
+    messages: list[str] = []
+    errors: list[tuple[str, str]] = []
+    view.statusMessage.connect(messages.append)
+    view.errorMessage.connect(lambda title, message: errors.append((title, message)))
+    message = (
+        "The board did not answer. The usual cause is a sketch built against "
+        "the stock TVout instead of the Video Experimenter fork."
+    )
+
+    view.onGridFailed(message)
+
+    assert messages[-1] == "The board did not answer."
+    assert errors[-1][1] == message
 
 
 def testGridToggleIsIndependentOfCaptureState(qtbot) -> None:

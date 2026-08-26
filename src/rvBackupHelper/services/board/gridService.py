@@ -78,14 +78,22 @@ class GridService:
             link.flush()
             reply = link.readline().decode("ascii", errors="replace").strip()
         if not reply:
+            # One short first line, then the causes: the first line is all a
+            # status bar can hold, and this message has already been cut in
+            # half once by one.
             raise BoardError(
-                "The board did not answer. The usual cause is a sketch built "
-                "against the stock TVout instead of the Video Experimenter fork: "
-                "nothing handles the input capture interrupt the overlay needs, "
-                "so the board resets on every sync pulse and never reaches its "
-                "command loop. Check which TVout is in the Arduino libraries "
-                "folder (see the README), then upload again. A board still "
-                "running the bring-up sketch is silent too - it takes no commands."
+                f"The board did not answer on {port}.\n\n"
+                "The port opened, so it is the sketch on the board that did not "
+                "reply. In rough order of likelihood:\n\n"
+                "1. The board is not running the generated grid sketch. Upload it "
+                "again from the Calibrate tab - the bring-up sketch is silent "
+                "because it accepts no commands at all.\n"
+                "2. Something else is holding the port: the Arduino IDE's serial "
+                "monitor, or a second copy of this application.\n"
+                "3. The sketch was built against the stock TVout, which leaves the "
+                "board resetting on every sync pulse. Help > Check Toolchain shows "
+                "which libraries a build uses; they now ship with the repository, "
+                "so this is the least likely of the three."
             )
         logger.info("Board replied %r to %r", reply, command)
         return reply

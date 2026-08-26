@@ -12,6 +12,7 @@ from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QFileDialog
 
 from rvBackupHelper import appConfig
+from rvBackupHelper.models.calibrationModels import CalibrationPoint
 from rvBackupHelper.services.settingsService import SettingsService
 from rvBackupHelper.ui.calibration.calibrationView import CalibrationView
 
@@ -381,15 +382,39 @@ uploadFailureText = (
 
 
 def testAnUploadFailureIsShownInFullNotJustTheStatusBar(
-    view: CalibrationView, qtbot, monkeypatch
+    view: CalibrationView, qtbot
 ) -> None:
-    shown: list[str] = []
-    monkeypatch.setattr(view, "showUploadError", shown.append)
+    errors: list[tuple[str, str]] = []
+    view.errorMessage.connect(lambda title, message: errors.append((title, message)))
+
     with qtbot.waitSignal(view.statusMessage) as caught:
         view.onUploadFailed(uploadFailureText)
 
-    # The whole message reaches the dialog, including the trailing detail.
-    assert shown == [uploadFailureText]
-    assert "Data directory: C:\\Somewhere\\Else\\Arduino15" in shown[0]
+    # The whole message goes to the dialog, including the trailing detail.
+    assert errors == [("Upload failed", uploadFailureText)]
+    assert "Data directory: C:\\Somewhere\\Else\\Arduino15" in errors[0][1]
     # The bar gets a readable headline rather than a flattened wall of text.
     assert caught.args[0] == "arduino-cli failed:"
+
+
+def testEveryCalibrationFailureReachesTheDialog(
+    view: CalibrationView, tmp_path: Path, monkeypatch
+) -> None:
+    """Saving, generating and loading all fail with a reason worth reading."""
+    errors: list[tuple[str, str]] = []
+    view.errorMessage.connect(lambda title, message: errors.append((title, message)))
+    view.calibration.points.append(CalibrationPoint(3.0, 430))
+
+    def explode(*args, **kwargs):
+        raise OSError("the disk is read-only")
+
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName", staticmethod(lambda *a: (str(tmp_path / "c.json"), ""))
+    )
+    monkeypatch.setattr(view.service, "save", explode)
+    view.onSaveClicked()
+
+    assert errors
+    title, message = errors[-1]
+    assert title == "Save failed"
+    assert "read-only" in message

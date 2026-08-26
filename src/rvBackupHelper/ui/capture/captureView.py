@@ -21,6 +21,7 @@ from rvBackupHelper.services.board.gridWorker import GridWorker
 from rvBackupHelper.services.capture.captureWorker import CaptureWorker
 from rvBackupHelper.services.capture.deviceScanWorker import DeviceScanWorker
 from rvBackupHelper.services.capture.recordingService import buildClipPath
+from rvBackupHelper.ui.dialogs.errorDialog import headlineOf
 from rvBackupHelper.ui.widgets.videoDisplay import VideoDisplay
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,8 @@ class CaptureView(QWidget):
     """Live preview plus recording controls."""
 
     statusMessage = Signal(str)
+    # Failures, as (title, whole message). The status bar cannot hold them.
+    errorMessage = Signal(str, str)
     # Payload is the Path of a clip that finished recording.
     clipRecorded = Signal(object)
 
@@ -165,7 +168,7 @@ class CaptureView(QWidget):
         self.updateControls()
 
     def onScanFailed(self, message: str) -> None:
-        self.statusMessage.emit(f"Device scan failed: {message}")
+        self.reportError("Device scan failed", message)
 
     def onScanFinished(self) -> None:
         if self.scanWorker is not None:
@@ -240,9 +243,17 @@ class CaptureView(QWidget):
             "no other application (such as OBS) is using the device."
         )
 
+    def reportError(self, title: str, message: str) -> None:
+        """A headline on the bar, the whole thing in a dialog.
+
+        The bar elides, and what it elides is the end of the message - which
+        is where a failure keeps the part worth acting on.
+        """
+        self.statusMessage.emit(headlineOf(message))
+        self.errorMessage.emit(title, message)
+
     def onCaptureError(self, message: str) -> None:
-        logger.warning("Capture error: %s", message)
-        self.statusMessage.emit(message)
+        self.reportError("Capture failed", message)
 
     def onCaptureFinished(self) -> None:
         if self.captureWorker is not None:
@@ -304,7 +315,7 @@ class CaptureView(QWidget):
         # Put the button back where it was: the board did not do as asked.
         self.gridToggle.setChecked(not self.gridToggle.isChecked())
         self.updateGridToggleText()
-        self.statusMessage.emit(message)
+        self.reportError("Arduino", message)
 
     def onGridFinished(self) -> None:
         if self.gridWorker is not None:

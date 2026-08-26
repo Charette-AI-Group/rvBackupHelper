@@ -19,7 +19,6 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QRadioButton,
     QTableWidget,
@@ -48,6 +47,7 @@ from rvBackupHelper.services.sketch.sketchService import (
     defaultSketchPath,
     sketchFolderPath,
 )
+from rvBackupHelper.ui.dialogs.errorDialog import headlineOf
 from rvBackupHelper.ui.widgets.clipBrowser import ClipBrowser
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,8 @@ class CalibrationView(QWidget):
     """A clip browser with a panel for recording measured distances."""
 
     statusMessage = Signal(str)
+    # Failures, as (title, whole message). The status bar cannot hold them.
+    errorMessage = Signal(str, str)
 
     def __init__(
         self,
@@ -296,7 +298,7 @@ class CalibrationView(QWidget):
             self.service.save(self.calibration, path)
         except OSError as exc:
             logger.warning("Could not save calibration: %s", exc)
-            self.statusMessage.emit(f"Could not save calibration: {exc}")
+            self.reportError("Save failed", f"Could not save calibration: {exc}")
             return
         self.calibrationPath = path
         self.statusMessage.emit(
@@ -324,7 +326,7 @@ class CalibrationView(QWidget):
             self.sketchService.save(self.calibration, path)
         except (SketchError, OSError) as exc:
             logger.warning("Could not generate sketch: %s", exc)
-            self.statusMessage.emit(f"Could not generate sketch: {exc}")
+            self.reportError("Sketch generation failed", f"Could not generate sketch: {exc}")
             return
         self.sketchPath = path
         self.settingsService.setLastSketchPath(path)
@@ -366,25 +368,17 @@ class CalibrationView(QWidget):
     def onUploadFinished(self, summary: str) -> None:
         self.statusMessage.emit(summary)
 
-    def onUploadFailed(self, message: str) -> None:
-        # The status bar shows one line and truncates the rest, which quietly
-        # hid the part that matters: the toolchain and data directory are at the
-        # end of the message, so the reader saw arduino-cli's own misleading
-        # advice and nothing that would correct it. Headline on the bar, whole
-        # text in a dialog that can be read and copied.
-        lines = [line for line in message.splitlines() if line.strip()]
-        self.statusMessage.emit(lines[0] if lines else message)
-        self.showUploadError(message)
+    def reportError(self, title: str, message: str) -> None:
+        """A headline on the bar, the whole thing in a dialog.
 
-    def showUploadError(self, message: str) -> None:
-        """Kept separate so tests can watch for it without a dialog opening."""
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle("Upload failed")
-        box.setText(message)
-        # The useful part is a path; it needs to be copyable.
-        box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        box.exec()
+        The bar elides, and what it elides is the end of the message - which
+        is where a failure keeps the part worth acting on.
+        """
+        self.statusMessage.emit(headlineOf(message))
+        self.errorMessage.emit(title, message)
+
+    def onUploadFailed(self, message: str) -> None:
+        self.reportError("Upload failed", message)
 
     def onUploadDone(self) -> None:
         if self.uploadWorker is not None:
@@ -406,7 +400,7 @@ class CalibrationView(QWidget):
             calibration = self.service.load(path)
         except CalibrationError as exc:
             logger.warning("Could not load calibration: %s", exc)
-            self.statusMessage.emit(str(exc))
+            self.reportError("Could not load calibration", str(exc))
             return
         self.calibration = calibration
         self.calibrationPath = path

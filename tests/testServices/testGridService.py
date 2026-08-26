@@ -118,16 +118,40 @@ def testASerialFailureIsWrapped() -> None:
         service.setGridVisible(False)
 
 
-def testSilencePointsAtTheLibrary() -> None:
-    """Silence reads as a serial fault and usually is not one.
+def testSilenceListsItsCausesInOrder() -> None:
+    """Silence reads as a serial fault and is usually something else.
 
-    It cost a session once: the board was rebooting on every sync pulse because
-    the sketch had been built against the stock TVout.
+    The causes are ranked because the ranking has already changed once: the
+    stock TVout was the likely one until the libraries were committed to the
+    repository, and leading with it after that sent the reader the wrong way.
     """
     service = serviceWith(FakeLink(reply=b""))
 
-    with pytest.raises(BoardError, match="stock TVout"):
+    with pytest.raises(BoardError) as raised:
         service.setGridVisible(False)
+
+    message = str(raised.value)
+    assert message.index("not running the generated grid sketch") < message.index(
+        "stock TVout"
+    )
+
+
+def testSilenceOpensWithOneShortLine() -> None:
+    """The first line is all a status bar can hold, and this message was cut
+
+    in half by one - at "the Video Experimenter fc", losing every instruction
+    it carried.
+    """
+    service = serviceWith(FakeLink(reply=b""))
+
+    with pytest.raises(BoardError) as raised:
+        service.setGridVisible(False)
+
+    headline = str(raised.value).splitlines()[0]
+    assert headline == "The board did not answer on COM9."
+    # Roughly what the bar holds; the exact figure lives in the dialog helper,
+    # and a service test has no business importing from the interface layer.
+    assert len(headline) <= 100
 
 
 def testBoardIsFoundByVendorId(monkeypatch) -> None:
