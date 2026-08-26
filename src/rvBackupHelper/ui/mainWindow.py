@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
 )
 
 from rvBackupHelper import appConfig
+from rvBackupHelper.services.board.hardwareService import HardwareReport
+from rvBackupHelper.services.board.hardwareWorker import HardwareWorker
 from rvBackupHelper.services.board.toolchainService import ToolchainReport
 from rvBackupHelper.services.board.toolchainWorker import ToolchainWorker
 from rvBackupHelper.services.manual.manualWorker import ManualWorker
@@ -42,6 +44,7 @@ class MainWindow(QMainWindow):
         self.settingsService = settingsService or SettingsService()
         self.manualWorker: ManualWorker | None = None
         self.toolchainWorker: ToolchainWorker | None = None
+        self.hardwareWorker: HardwareWorker | None = None
 
         self.captureView = CaptureView()
         # Calibrate embeds the same clip browser a separate Review tab would
@@ -97,8 +100,14 @@ class MainWindow(QMainWindow):
 
         helpMenu = self.helpMenu = self.menuBar().addMenu("&Help")
 
-        # First in the menu because it is what you reach for when something is
-        # wrong, and everything else here is reading rather than diagnosing.
+        # The diagnostics come first: they are what you reach for when
+        # something is wrong, and everything else here is reading. Hardware
+        # before toolchain because it is the cheaper question and the earlier
+        # one - a missing grabber is not a software problem.
+        self.hardwareAction = QAction("Check &Hardware...", self)
+        self.hardwareAction.triggered.connect(self.onCheckHardware)
+        helpMenu.addAction(self.hardwareAction)
+
         self.toolchainAction = QAction("Check &Toolchain...", self)
         self.toolchainAction.triggered.connect(self.onCheckToolchain)
         helpMenu.addAction(self.toolchainAction)
@@ -205,6 +214,44 @@ class MainWindow(QMainWindow):
             self.manualWorker = None
         self.manualAction.setEnabled(True)
 
+    def onCheckHardware(self) -> None:
+        """Ask what is plugged in, before asking whether it can be built for.
+
+        Cheap, needs no board conversation and no compiler, and answers the
+        question an upload failure otherwise answers expensively and late.
+        """
+        if self.hardwareWorker is not None:
+            return
+        self.hardwareAction.setEnabled(False)
+        self.showStatus("Looking for the grabber and the Arduino...")
+        worker = HardwareWorker(parent=self)
+        worker.checked.connect(self.onHardwareChecked)
+        worker.finished.connect(self.onHardwareCheckFinished)
+        self.hardwareWorker = worker
+        worker.start()
+
+    def onHardwareChecked(self, report: HardwareReport) -> None:
+        self.showStatus(report.headline)
+        self.showHardwareReport(report)
+
+    def showHardwareReport(self, report: HardwareReport) -> None:
+        """Kept separate so tests can watch for it without a dialog opening."""
+        box = QMessageBox(self)
+        box.setIcon(
+            QMessageBox.Icon.Information if report.ok else QMessageBox.Icon.Warning
+        )
+        box.setWindowTitle("Hardware")
+        box.setText(report.headline)
+        box.setInformativeText(report.details)
+        box.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        box.exec()
+
+    def onHardwareCheckFinished(self) -> None:
+        if self.hardwareWorker is not None:
+            self.hardwareWorker.deleteLater()
+            self.hardwareWorker = None
+        self.hardwareAction.setEnabled(True)
+
     def onCheckToolchain(self) -> None:
         """Compile something, and report what the compiler used.
 
@@ -258,6 +305,8 @@ class MainWindow(QMainWindow):
             # A compile in flight; it is short, and leaving the thread running
             # into interpreter shutdown is how a clean exit turns into a crash.
             self.toolchainWorker.wait(int(appConfig.uploadTimeoutSeconds * 1000))
+        if self.hardwareWorker is not None:
+            self.hardwareWorker.wait(int(appConfig.hardwareCheckTimeoutSeconds * 1000))
         self.captureView.shutdown()
         self.calibrationView.shutdown()
         super().closeEvent(event)

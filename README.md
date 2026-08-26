@@ -25,8 +25,18 @@ python -m venv .venv
 ```
 
 That last line is the third install: it fetches `arduino-cli` and the AVR core if they are
-missing, then compiles the sketch to prove it. Confirm the machine with `pytest` and with
-**Help > Check Toolchain** in the app.
+missing, then compiles the sketch to prove it. Confirm the machine with `pytest`, and in the app
+with **Help > Check Hardware** and **Help > Check Toolchain**.
+
+Check Hardware needs none of the above and can be run first, on a machine with nothing on it:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\checkHardware.ps1
+```
+
+It uses only `Get-PnpDevice`, names the board by USB id — so an Uno R4, Leonardo or Mega is
+caught before anything is downloaded — and says whether a capture device is present. It cannot
+see the Video Experimenter shield, which is passive, and it cannot tell composite from AHD.
 
 | Where it comes from | What you get |
 |---|---|

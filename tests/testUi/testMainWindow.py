@@ -10,6 +10,10 @@ from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import QFileDialog
 
 from rvBackupHelper import appConfig
+from rvBackupHelper.services.board.hardwareService import (
+    HardwareReport,
+    HardwareService,
+)
 from rvBackupHelper.services.board.toolchainService import (
     ToolchainReport,
     ToolchainService,
@@ -57,8 +61,13 @@ def testMenuBarStructure(qtbot) -> None:
     assert any(a.isSeparator() for a in mainWindow.fileMenu.actions())
 
     helpItems = [a.text() for a in mainWindow.helpMenu.actions() if not a.isSeparator()]
-    # Check Toolchain first: it is what you reach for when something is wrong.
-    assert helpItems == ["Check &Toolchain...", "User &Manual...", "&About"]
+    # Diagnostics first, hardware before toolchain: the cheaper, earlier question.
+    assert helpItems == [
+        "Check &Hardware...",
+        "Check &Toolchain...",
+        "User &Manual...",
+        "&About",
+    ]
     assert any(a.isSeparator() for a in mainWindow.helpMenu.actions())
 
 
@@ -354,3 +363,40 @@ def testAboutOpensTheDialogAndReportsADonation(qtbot, monkeypatch) -> None:
     mainWindow.onHelpAbout()
 
     assert "donation page" in mainWindow.statusBar().currentMessage()
+
+
+def testCheckingHardwareRunsOffTheInterfaceThread(qtbot, monkeypatch) -> None:
+    """Starting PowerShell and walking the USB tree takes about a second."""
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    report = HardwareReport(ok=True, headline="Ready.", details="Arduino Uno R3 on COM3.")
+    monkeypatch.setattr(HardwareService, "check", lambda self: report)
+    monkeypatch.setattr(MainWindow, "showHardwareReport", lambda self, report: None)
+
+    with qtbot.waitSignal(mainWindow.hardwareAction.changed, timeout=5000):
+        mainWindow.onCheckHardware()
+    assert not mainWindow.hardwareAction.isEnabled()
+
+    assert mainWindow.hardwareWorker is not None
+    mainWindow.hardwareWorker.wait(5000)
+    qtbot.waitUntil(lambda: mainWindow.hardwareWorker is None, timeout=5000)
+    assert mainWindow.hardwareAction.isEnabled()
+
+
+def testTheHardwareVerdictReachesTheBarAndADialog(qtbot, monkeypatch) -> None:
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+    report = HardwareReport(
+        ok=False,
+        headline="No Arduino found.",
+        details="Plug the board in by USB.",
+    )
+    shown: list[HardwareReport] = []
+    monkeypatch.setattr(
+        MainWindow, "showHardwareReport", lambda self, report: shown.append(report)
+    )
+
+    mainWindow.onHardwareChecked(report)
+
+    assert mainWindow.statusBar().currentMessage() == "No Arduino found."
+    assert shown == [report]

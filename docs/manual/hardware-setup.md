@@ -78,6 +78,23 @@ jumpy.
 > SELECT on Overlay it slides against the incoming video. Flashing the matching
 > build fixes it with no wiring change at all.
 
+## Is it even plugged in?
+
+**Help > Check Hardware** answers that in a second, without touching the board
+or compiling anything. It names the Arduino by its USB id — so an Uno R4, a
+Leonardo or a Mega is identified by name rather than left to fail at upload —
+and reports whether a video capture device is present.
+
+Two limits are worth knowing, and it repeats the first one every time it runs:
+
+* **It cannot see the Video Experimenter shield.** The shield is passive and
+  enumerates nothing, so a board being present never means the shield is on it.
+* **A clone reports only its CH340 bridge.** A clone Uno and a clone Mega look
+  identical from here, so a clone is reported as unverifiable rather than good.
+
+Whether the camera is composite or AHD is invisible from the USB bus too. That
+one is still the go/no-go test at the vehicle.
+
 ## Proving the rig before you trust it
 
 `arduino/rvbhBringUp/` is a diagnostic sketch that draws a border, three

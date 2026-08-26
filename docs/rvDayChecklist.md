@@ -84,10 +84,19 @@ machine with nothing on it and is the only place that list is kept. Then, before
   see `docs/troubleshooting/2026-08-25-laptop-bring-up.md`.
 - Run `pytest` once, from your own terminal, for the same reason. The sketch compile test must
   pass rather than skip — a skip means the AVR core is not there.
+- Plug in the board and the grabber and run **Help > Check Hardware** on the laptop. It names
+  the board by USB id, so it catches a wrong Uno, and says whether a capture device enumerated
+  at all:
+
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File tools\checkHardware.ps1
+  ```
+
+  It cannot see the shield, and it cannot tell composite from AHD — those stay the go/no-go
+  test at the vehicle.
 - **CH340 USB driver** if the Uno you are packing is a clone. The desktop's board is genuine
-  and needed none, so this is easy to forget. Plug the board in and confirm it appears, rather
-  than assuming.
-- Confirm the **USB video grabber** works on the laptop, not only on the desktop.
+  and needed none, so this is easy to forget. Check Hardware reports a clone as unverifiable
+  rather than good, because a clone Mega and a clone Uno are indistinguishable.
 - Claude Code needs internet. If the RV is parked without signal, plan on phone tethering.
 
 ## To pack

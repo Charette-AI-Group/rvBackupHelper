@@ -148,6 +148,16 @@ serialTimeoutSeconds = 2.0
 # USB vendor ids: Arduino LLC, and the CH340 most clones use.
 boardVendorIds = (0x2341, 0x2A03, 0x1A86)
 
+# Is the hardware plugged in? Asked by a PowerShell script rather than from
+# here, because an installer has to be able to ask it before Python exists on
+# the machine - and one script means the app and the installer cannot give two
+# different answers. See tools/checkHardware.ps1.
+hardwareCheckScript = projectRoot / "tools" / "checkHardware.ps1"
+# Windows PowerShell 5.1, which ships with Windows; not pwsh, which does not.
+powerShellExecutable = "powershell"
+# Starting PowerShell and walking the USB tree, with room for a slow machine.
+hardwareCheckTimeoutSeconds = 60.0
+
 # Uploading sketches without the Arduino IDE. arduino-cli is looked up on PATH
 # first; this is where winget puts it when it is not.
 arduinoCliPath = r"C:\Program Files\Arduino CLI\arduino-cli.exe"
