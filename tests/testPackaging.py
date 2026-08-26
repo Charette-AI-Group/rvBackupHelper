@@ -77,6 +77,35 @@ def testMissingHardwareDoesNotBlockTheInstall() -> None:
     assert "MB_YESNO" in installerText
 
 
+def testWingetIsNeverRunWithoutCheckingItIsThere() -> None:
+    """Windows Sandbox has no winget, and neither do LTSC or managed builds.
+
+    Handing Inno a filename that does not exist raises an error dialog in the
+    middle of an install, which is a poor way to learn about a dependency.
+    """
+    runLines = [line for line in installerText.splitlines() if "GetWinget" in line]
+    runEntries = [line for line in runLines if line.startswith("Filename:")]
+
+    assert runEntries, "the winget step should still exist"
+    for line in runEntries:
+        assert "Check: ShouldInstallArduinoCli" in line
+
+
+def testAMachineWithoutWingetIsToldRatherThanLeftGuessing() -> None:
+    assert "winget is not available on this machine" in installerText
+    assert "ssPostInstall" in installerText
+
+
+def testTheSandboxConfigurationIsThere() -> None:
+    """A disposable clean Windows is the only honest first-run test."""
+    sandbox = appConfig.projectRoot / "installer" / "testSandbox.wsb"
+    text = sandbox.read_text(encoding="utf-8")
+
+    assert "<Configuration>" in text
+    assert "ReadOnly>true" in text, "the host folder must not be writable from inside"
+    assert "Networking>Enable" in text, "the core download is part of what it tests"
+
+
 def testTheInstalledAdviceDoesNotPointAtAToolThatIsNotThere(monkeypatch) -> None:
     """A frozen build has no Python and no tools folder."""
     from rvBackupHelper.services.board.toolchainService import setupAdvice

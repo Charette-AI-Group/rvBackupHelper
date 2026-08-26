@@ -236,7 +236,30 @@ The wizard is ordered so everything cheap happens before anything expensive:
 4. **The AVR core**, last, as a **tick box** — 295 MB, and only uploading needs it.
 
 Missing hardware warns and asks; it does not block. Calibrating footage and generating a sketch
-need no board and no grabber, so refusing to install would turn a warning into a lie.
+need no board and no grabber, so refusing to install would turn a warning into a lie. If winget
+is absent — Windows Sandbox has none, nor do LTSC and many managed builds — the arduino-cli
+step is skipped and setup says so at the end rather than failing mid-install.
+
+### Trying it as somebody who has nothing
+
+`installer\testSandbox.wsb` opens the built installer inside **Windows Sandbox**: a disposable
+copy of Windows, clean on every launch and discarded on close. Enable the feature once, in an
+administrator PowerShell, then reboot:
+
+```powershell
+Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -All
+```
+
+Then double-click the `.wsb`. It maps `dist\` in read-only and opens it on the sandbox desktop.
+Edit the `HostFolder` line if this clone lives somewhere other than `W:\projects\26rvBackupHelper`.
+
+It has networking, so the 295 MB download is real, and the wizard, the per-user install, the
+first-run seeding and the uninstaller all behave as they would on a stranger's machine. It has
+**no USB passthrough**, so the hardware page will find nothing — which is worth watching on
+purpose, since that is the path a new user with an unopened box will meet.
+
+For the hardware half, a second Windows user account is the cheaper honest test: the install,
+the data folder and `%LOCALAPPDATA%\Arduino15` are all clean there, and USB works normally.
 
 ## Arduino toolchain
 

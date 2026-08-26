@@ -64,7 +64,7 @@ Name: "{group}\{#AppName}"; Filename: "{app}\{#ExeName}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#ExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{code:GetWinget}"; Parameters: "install --id ArduinoSA.CLI --exact --accept-package-agreements --accept-source-agreements"; StatusMsg: "Installing arduino-cli..."; Flags: runhidden waituntilterminated; Check: NeedsArduinoCli
+Filename: "{code:GetWinget}"; Parameters: "install --id ArduinoSA.CLI --exact --accept-package-agreements --accept-source-agreements"; StatusMsg: "Installing arduino-cli..."; Flags: runhidden waituntilterminated; Check: ShouldInstallArduinoCli
 Filename: "{code:GetArduinoCli}"; Parameters: "core install {#CoreName}"; StatusMsg: "Downloading the Arduino AVR compiler (about 295 MB) - this takes a few minutes..."; Flags: runhidden waituntilterminated; Tasks: avrcore; Check: HaveArduinoCli
 Filename: "{app}\{#ExeName}"; Description: "Start {#AppName}"; Flags: nowait postinstall skipifsilent
 
@@ -173,7 +173,8 @@ end;
 
 function FindArduinoCli: String;
 var
-  Candidate: String;
+  Candidates: array[0..2] of String;
+  Index: Integer;
 begin
   if CliSearched then
   begin
@@ -182,21 +183,29 @@ begin
   end;
   CliSearched := True;
   CachedCliPath := '';
-  Candidate := ExpandConstant('{pf}\Arduino CLI\arduino-cli.exe');
-  if FileExists(Candidate) then
-    CachedCliPath := Candidate
-  else
-  begin
-    Candidate := ExpandConstant('{localappdata}\Microsoft\WinGet\Links\arduino-cli.exe');
-    if FileExists(Candidate) then
-      CachedCliPath := Candidate;
-  end;
+  Candidates[0] := ExpandConstant('{commonpf}\Arduino CLI\arduino-cli.exe');
+  Candidates[1] := ExpandConstant('{commonpf32}\Arduino CLI\arduino-cli.exe');
+  Candidates[2] := ExpandConstant('{localappdata}\Microsoft\WinGet\Links\arduino-cli.exe');
+  for Index := 0 to 2 do
+    if (CachedCliPath = '') and FileExists(Candidates[Index]) then
+      CachedCliPath := Candidates[Index];
   Result := CachedCliPath;
 end;
 
-function NeedsArduinoCli: Boolean;
+{ Empty when winget is not on this machine, which is commoner than it sounds:
+  Windows Sandbox ships without it, and so do LTSC and plenty of managed
+  builds. Handing Inno a filename that does not exist raises an error dialog
+  in the middle of an install, so every use of it is guarded. }
+function FindWinget: String;
 begin
-  Result := FindArduinoCli = '';
+  Result := ExpandConstant('{localappdata}\Microsoft\WindowsApps\winget.exe');
+  if not FileExists(Result) then
+    Result := '';
+end;
+
+function ShouldInstallArduinoCli: Boolean;
+begin
+  Result := (FindArduinoCli = '') and (FindWinget <> '');
 end;
 
 { Re-checked rather than cached: winget may have just installed it. }
@@ -213,5 +222,32 @@ end;
 
 function GetWinget(Param: String): String;
 begin
-  Result := ExpandConstant('{localappdata}\Microsoft\WindowsApps\winget.exe');
+  Result := FindWinget;
+end;
+
+{ Said once, at the end, when the toolchain could not be put in place. Silence
+  would leave somebody to discover it at the first upload instead - which is
+  the failure this whole ordering exists to avoid. }
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  Advice: String;
+begin
+  if (CurStep <> ssPostInstall) or WizardSilent then
+    Exit;
+  CliSearched := False;
+  if FindArduinoCli <> '' then
+    Exit;
+  Advice := 'arduino-cli is not installed, so uploading to the board will not work yet.'
+    + #13#10#13#10 + 'Everything else does: recording, calibrating and generating a sketch.'
+    + #13#10#13#10;
+  if FindWinget = '' then
+    Advice := Advice + 'winget is not available on this machine, so setup could not '
+      + 'install it for you. Download arduino-cli from arduino.cc, then run:'
+      + #13#10#13#10 + '    arduino-cli core install {#CoreName}'
+  else
+    Advice := Advice + 'Install it with:' + #13#10#13#10
+      + '    winget install --id ArduinoSA.CLI --exact' + #13#10
+      + '    arduino-cli core install {#CoreName}';
+  Advice := Advice + #13#10#13#10 + 'Help > Check Toolchain will confirm it once it is there.';
+  MsgBox(Advice, mbInformation, MB_OK);
 end;

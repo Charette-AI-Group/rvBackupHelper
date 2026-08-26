@@ -1,0 +1,45 @@
+<!--
+  Run the installer as somebody who has nothing.
+
+  Windows Sandbox is a disposable copy of Windows: clean on every launch,
+  discarded on close, so a first-run experience can be tried more than once.
+  Double-click this file once the feature is enabled (Windows 11 Pro):
+
+      Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -All
+
+  in an administrator PowerShell, then reboot.
+
+  HostFolder must be an absolute path, so edit the line below if this clone
+  lives somewhere other than W:\projects\26rvBackupHelper. Run tools\buildExe.py
+  and the Inno Setup compile first - the folder it maps is dist\, which is
+  where both the bundle and rvBackupHelperSetup-*.exe end up.
+
+  WHAT THIS CAN AND CANNOT TRY
+
+  It has networking, so the 295 MB core download is real, and the wizard, the
+  per-user install, first-run seeding and the uninstaller all behave as they
+  would on a stranger's machine.
+
+  It has no USB passthrough, so no Arduino and no grabber. The hardware page
+  will find nothing - which is worth seeing on purpose: it is the warn-and-
+  continue path, and the one a new user with the box still unopened will meet.
+
+  It also ships without winget. The installer handles that by saying so at the
+  end rather than failing, and this is the cheapest place to watch it happen.
+-->
+<Configuration>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>W:\projects\26rvBackupHelper\dist</HostFolder>
+      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\rvBackupHelper</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <!-- A Qt application on software rendering is painful to judge. -->
+  <vGPU>Enable</vGPU>
+  <Networking>Enable</Networking>
+  <MemoryInMB>8192</MemoryInMB>
+  <LogonCommand>
+    <Command>explorer.exe C:\Users\WDAGUtilityAccount\Desktop\rvBackupHelper</Command>
+  </LogonCommand>
+</Configuration>
