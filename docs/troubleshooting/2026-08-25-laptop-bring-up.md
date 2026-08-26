@@ -108,13 +108,28 @@ Two of these deserve emphasis:
 
 Two came out of the same session and both matter at the vehicle.
 
-**The board cannot answer serial commands without video.** `rvbhGrid` polls serial from
-TVout's horizontal blanking hook (`tv.set_hbi_hook(pserial.begin(...))`), and in overlay mode
-TVout's timing is slaved to the *incoming* sync. No video into the shield means no blanking
-interrupts, so nothing reads the UART, and `loop()` waits in `tv.delay_frame(2)` for frames
-that never arrive. The grid toggle will be silent — and since the rear camera is likely
-powered only in reverse gear, **stay in reverse while toggling the grid.** This looks exactly
-like the wrong-TVout fault and is not.
+**The board answers serial commands unreliably without video.** The advice stands — since the
+rear camera is likely powered only in reverse gear, **stay in reverse while toggling the
+grid** — but the mechanism first written here was wrong, and it is corrected below rather than
+left standing, because a wrong mechanism costs time later.
+
+It is not that nothing reads the UART. `hbi_hook` is called from `ISR(TIMER1_OVF_vect)` as
+well as from the input capture ISR, and `initOverlay()` leaves Timer1 free-running in normal
+mode, so the overflow still fires every 65536 cycles — about every 4.1 ms — with no video at
+all. pollserial is polled at roughly 244 Hz and the byte lands in its ring buffer.
+
+What starves is `loop()`. `tv.delay_frame(2)` spins on `display.scanLine`, which advances one
+line per call to `line_handler()` — so one per timer overflow rather than one per 63.5 µs
+scan line. A 262-line NTSC frame therefore takes about **1.07 s** instead of 16.7 ms, and
+`delay_frame(2)` holds `loop()` for roughly 2.1 s between calls to `handleCommands()`. The
+host waits 2 s after opening the port and then reads with a 2 s timeout, so the reply has to
+win a race it only sometimes wins. That is why the symptom is *intermittent* silence, which
+is also what tells it apart from the wrong-TVout fault, where the board never answers at all.
+
+Derived from the vendored library source rather than measured on the bench. If reliable
+toggling without video is ever wanted, the fix is in the sketch: handle commands in a tight
+loop and keep the frame wait around the redraw in `applyGrid()`, which is the part that
+actually must not write the buffer while it is being scanned out.
 
 **Washed-out composite with no colour is a bad RCA contact, not an overexposed source.**
 Measured on the bench VHS feed before and after reseating the plug:
@@ -161,9 +176,14 @@ The TVout libraries were real all along; only the core was missing.
 - **The board's flash state is unknown.** The uploads reported during this session ran through
   the same unreliable view, so do not assume `rvbhGrid` is on it. Re-flash and confirm by
   asking the board `?` with video going into the shield.
-- `arduino/rvbhGrid/rvbhGrid.ino` has an uncommitted regeneration in the working tree. Its
-  header source clip lost the `rvbh-` prefix (`2026-08-19_09-39-59.mkv`), which may be
-  unintended.
+- ~~`arduino/rvbhGrid/rvbhGrid.ino` lost the `rvbh-` prefix from its header source clip.~~
+  **Closed, not a defect.** `calibration/260819rvbhCalibration.json` records
+  `sourceClip: "2026-08-19_09-39-59.mkv"` — OBS's own naming, since that clip was not recorded
+  by this app — and regenerating from a loaded calibration correctly reports what the
+  calibration says. The desktop copy of the same footage had been renamed with an `rvbh-`
+  prefix by hand, and generating with that clip *open* takes the name from the open file
+  (`calibrationView.py`, `sourceClip = clipInfo.path.name`). Two names for one recording, both
+  honestly reported. Worth knowing only so the next reader does not go looking for a bug.
 - `pytest` figures quoted **earlier** today (224, 227, 237 passing) included
   `testSketchCompiles.py` running against the phantom toolchain and meant nothing. Re-run after
   the core was really installed: **237 passed, 0 skipped**. Worth running once from your own
