@@ -108,10 +108,11 @@ Two of these deserve emphasis:
 
 Two came out of the same session and both matter at the vehicle.
 
-**The board answers serial commands unreliably without video.** The advice stands — since the
-rear camera is likely powered only in reverse gear, **stay in reverse while toggling the
-grid** — but the mechanism first written here was wrong, and it is corrected below rather than
-left standing, because a wrong mechanism costs time later.
+**The board answers serial commands unreliably without video.** True of the sketch as it stood
+that day, and the practical advice was to stay in reverse while toggling the grid, since RV
+cameras are often powered only in reverse gear. The mechanism first written here was wrong
+though, and it is corrected below rather than left standing — a wrong mechanism costs time
+later, and this one pointed at the wrong line of the sketch to fix.
 
 It is not that nothing reads the UART. `hbi_hook` is called from `ISR(TIMER1_OVF_vect)` as
 well as from the input capture ISR, and `initOverlay()` leaves Timer1 free-running in normal
@@ -126,10 +127,15 @@ host waits 2 s after opening the port and then reads with a 2 s timeout, so the 
 win a race it only sometimes wins. That is why the symptom is *intermittent* silence, which
 is also what tells it apart from the wrong-TVout fault, where the board never answers at all.
 
-Derived from the vendored library source rather than measured on the bench. If reliable
-toggling without video is ever wanted, the fix is in the sketch: handle commands in a tight
-loop and keep the frame wait around the redraw in `applyGrid()`, which is the part that
-actually must not write the buffer while it is being scanned out.
+Derived from the vendored library source rather than measured on the bench.
+
+**Fixed in the generator the same day, so a sketch regenerated after this reads differently.**
+`loop()` is now just `handleCommands()`, the frame wait moved into `applyGrid()` where the
+buffer is actually rewritten, and `setGridVisible()` answers before it redraws rather than
+after — with no video that redraw costs about a second, which is most of the host's patience.
+Nothing about the picture changes: the redraw still starts at a frame boundary, which is the
+only reason the wait existed. **The prediction to check on hardware** is that the grid toggle
+now answers with no video going into the shield, where before it mostly did not.
 
 **Washed-out composite with no colour is a bad RCA contact, not an overexposed source.**
 Measured on the bench VHS feed before and after reseating the plug:

@@ -168,11 +168,19 @@ void handleCommands() {
 void setGridVisible(bool visible) {
   gridVisible = visible;
   EEPROM.update(GRID_STATE_ADDRESS, visible ? 1 : 0);
-  applyGrid();
+  // Answer first, redraw second. The redraw waits for a frame boundary, and
+  // with no video into the shield a frame takes about a second - long enough
+  // for the host to give up on a reply whose content was already decided.
   reportState();
+  applyGrid();
 }
 
 void applyGrid() {
+  // Writing to the buffer while the video generator is scanning it out is what
+  // makes the overlay jump, so start at a frame boundary and use the blanking
+  // interval to draw in. delay_frame rather than delay() keeps the wait
+  // cooperative with video generation.
+  tv.delay_frame(1);
   tv.fill(0);
   if (gridVisible) {
     drawGrid();
@@ -242,12 +250,18 @@ void drawBrokenLine(const GridLine &line) {
 
 $widthDrawing
 
+// Nothing is drawn here: the buffer is rewritten only when a command changes
+// what should be on it, and that redraw waits for a frame boundary itself.
+//
+// This used to wait two frames per pass, which was fine with video coming in
+// and useless without it. TVout counts frames from the incoming sync in overlay
+// mode; with no camera powered - and RV cameras are often live only in reverse
+// gear - a "frame" stretches from 16.7 ms to about a second, so commands were
+// answered every two seconds or so and the host timed out first. Polling costs
+// nothing that video generation needs: it is interrupt-driven, and this spins
+// no harder than delay_frame's own wait did.
 void loop() {
   handleCommands();
-  // Nothing is redrawn between commands. Writing to the buffer while the video
-  // generator is scanning it out is what makes the overlay jump, and delay_frame
-  // rather than delay() keeps the wait cooperative with video generation.
-  tv.delay_frame(2);
 }
 """
 )

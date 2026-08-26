@@ -122,6 +122,39 @@ def testSketchRefusesToBuildAgainstTheStockTVout(sketch: str) -> None:
     assert "(void)&TVout::capture;" in sketch
 
 
+def testTheCommandLoopIsNotGatedOnIncomingVideo(sketch: str) -> None:
+    """Commands must be answered whether or not the camera is powered.
+
+    TVout counts frames from the incoming sync in overlay mode, so a loop that
+    waits for frames answers every two seconds or so with no video going in -
+    slower than the host's read timeout, which made the board look dead. RV
+    cameras are often live only in reverse gear, so that is a real state.
+    """
+    loopBody = sketch.split("void loop() {")[1]
+
+    assert "handleCommands();" in loopBody
+    assert "delay_frame" not in loopBody
+
+
+def testTheRedrawStillWaitsForAFrameBoundary(sketch: str) -> None:
+    """The wait belongs here rather than in the loop.
+
+    This is the part that must not write to the buffer while the video
+    generator is scanning it out.
+    """
+    applyGrid = sketch.split("void applyGrid() {")[1].split("\n}")[0]
+
+    assert "tv.delay_frame(1);" in applyGrid
+    assert applyGrid.index("delay_frame") < applyGrid.index("tv.fill(0);")
+
+
+def testTheReplyComesBeforeTheRedraw(sketch: str) -> None:
+    """A redraw with no video takes about a second; the answer should not."""
+    body = sketch.split("void setGridVisible(bool visible) {")[1].split("\n}")[0]
+
+    assert body.index("reportState();") < body.index("applyGrid();")
+
+
 def testGridCountMatchesThePoints(sketch: str) -> None:
     assert "GRID_COUNT" in sketch
     assert len(gridRows(sketch)) == 3
