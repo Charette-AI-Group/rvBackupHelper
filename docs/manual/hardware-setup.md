@@ -95,31 +95,30 @@ What to look for:
 
 ## The software toolchain
 
-The application needs Python 3.14 and its own virtual environment:
+**The full list lives in *One-time setup* in the project README**, written for a
+machine with nothing on it and kept in that one place so the copies cannot
+drift. In short: Python 3.14 and a virtual environment for the application,
+then one command for the rest —
 
 ```powershell
-cd W:\projects\26rvBackupHelper
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+.venv\Scripts\python.exe tools\setupToolchain.py
 ```
 
-Flashing needs `arduino-cli`. The Arduino IDE is **not** required — the app
-uploads by itself, and the IDE is only useful if you want to hand-edit a sketch.
+which installs `arduino-cli` and the AVR core if they are missing and then
+compiles the real sketch to prove this machine can. The Arduino IDE is **not**
+required: the app uploads by itself, and the IDE is only useful if you want to
+hand-edit a sketch.
 
-```powershell
-winget install --id ArduinoSA.CLI --exact
-arduino-cli core install arduino:avr
-```
+The video library needs nothing at all. It is a **fork** — the TVout in the
+Arduino library manager will not work, and produces a board that uploads
+cleanly and then answers nothing — so the right one is committed to this
+repository at `arduino/libraries` and compiled against from there. A clone has
+it, and whatever sits in `Documents\Arduino\libraries` is not consulted.
 
-Then the video library. This is a **fork**; the TVout in the Arduino library
-manager will not work. Clone
-<https://github.com/nootropicdesign/arduino-tvout-ve> and copy its `TVout`,
-`TVoutfonts` and `pollserial` folders into `Documents\Arduino\libraries`.
-
-Confirm the whole chain with `pytest`. With the toolchain present the suite
-compiles a real sketch for an Uno as one of its tests; without it that test
-skips itself rather than failing.
+Confirm the whole chain with `pytest`, or with **Help > Check Toolchain** in the
+app. With the toolchain present the suite compiles a real sketch for an Uno as
+one of its tests; without it that test skips itself rather than failing, so a
+skip there is worth reading as a missing AVR core.
 
 ## Tips and traps
 

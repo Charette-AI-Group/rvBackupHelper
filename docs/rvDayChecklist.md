@@ -70,24 +70,24 @@ the overlay lands on the real rear view before trusting any measured line.
 
 Nothing here downloads quickly on campground wifi.
 
-- Python 3.14+, then `python -m venv .venv` and `pip install -e ".[dev]"` in the repo
-- The Arduino toolchain, in one command — it installs `arduino-cli` and the 295 MB AVR core if
-  they are missing, then compiles the real sketch and prints what it used:
+**Install everything by following *One-time setup* in the README**, which is written for a
+machine with nothing on it and is the only place that list is kept. Then, before leaving:
+
+- Prove the toolchain **on the laptop itself**, and accept nothing less than this tool's own
+  final line as proof:
 
   ```powershell
-  .venv\Scripts\python.exe tools\setupToolchain.py
+  .venv\Scripts\python.exe tools\setupToolchain.py --check
   ```
 
-  Do not accept anything less than its own final line as proof. A core reported present by a
-  check run somewhere else is what cost two hours on 2026-08-25; see
-  `docs/troubleshooting/2026-08-25-laptop-bring-up.md`.
-- **TVout: nothing to do.** The Video Experimenter fork is committed at `arduino/libraries`,
-  and the app and the tests both compile against that copy, so a clone has it and
-  `Documents\Arduino\libraries` is not consulted at all. This used to be the step most likely
-  to go wrong.
-- **CH340 USB driver** if the Uno is a clone. The desktop's board is genuine and needed none,
-  so this is easy to forget.
-- Run `pytest` once to confirm the whole chain works, including the sketch compile test.
+  A core reported present by a check run somewhere else is what cost two hours on 2026-08-25;
+  see `docs/troubleshooting/2026-08-25-laptop-bring-up.md`.
+- Run `pytest` once, from your own terminal, for the same reason. The sketch compile test must
+  pass rather than skip — a skip means the AVR core is not there.
+- **CH340 USB driver** if the Uno you are packing is a clone. The desktop's board is genuine
+  and needed none, so this is easy to forget. Plug the board in and confirm it appears, rather
+  than assuming.
+- Confirm the **USB video grabber** works on the laptop, not only on the desktop.
 - Claude Code needs internet. If the RV is parked without signal, plan on phone tethering.
 
 ## To pack

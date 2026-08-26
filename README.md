@@ -4,17 +4,52 @@ RV backup camera video capture, grid calibration and OSD overlay tooling
 
 ## One-time setup
 
+Written for a machine with nothing on it. Three things get installed; the repository and the
+setup tool bring the rest.
+
 ```powershell
-cd W:\projects\26rvBackupHelper
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+winget install --id Git.Git --exact
+winget install --id Python.Python.3.14 --exact
 ```
+
+**Python must be 3.14 or newer** — `pyproject.toml` requires it, and pip refuses an older one
+rather than half-working. Then, in a **new** shell, because winget only puts things on the PATH
+of processes started after it:
+
+```powershell
+git clone https://github.com/Charette-AI-Group/rvBackupHelper.git
+cd rvBackupHelper
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.venv\Scripts\python.exe tools\setupToolchain.py
+```
+
+That last line is the third install: it fetches `arduino-cli` and the AVR core if they are
+missing, then compiles the sketch to prove it. Confirm the machine with `pytest` and with
+**Help > Check Toolchain** in the app.
+
+| Where it comes from | What you get |
+|---|---|
+| `pip install -e ".[dev]"` | PySide6, numpy, opencv-python, pygrabber, pyserial, and pytest / pytest-qt / ruff |
+| The clone itself | The TVout-VE libraries, in `arduino/libraries` — nothing to install and no wrong version to install |
+| `tools\setupToolchain.py` | `arduino-cli`, and the `arduino:avr` core (a 295 MB download) |
+
+Internet is needed for the clone, for pip and for that core. Nothing afterwards: the only call
+the app makes is Help > User Manual checking whether the published copy is reachable, and it
+falls back to the copy in `docs/manual/`. The Arduino IDE is never needed.
+
+### Drivers, which are the part this repository cannot handle for you
+
+- **A genuine Uno R3 needs no driver** — Windows has the ATmega16U2 serial driver in the box.
+  **A clone with a CH340 does**, from the chip vendor. That case is why `boardVendorIds` in
+  `appConfig.py` carries `0x1A86` alongside Arduino's own ids.
+- **A UVC USB video grabber needs no driver either.** Some cheap EasyCap-style ones want a
+  vendor driver; find that out before the day you need the grabber, not on it.
 
 ## Daily workflow
 
 ```powershell
-cd W:\projects\26rvBackupHelper
+cd W:\projects\26rvBackupHelper   # wherever you cloned it
 .\.venv\Scripts\Activate.ps1
 rv-backup-helper
 ```
@@ -145,23 +180,25 @@ pytest
 ruff check src tests
 ```
 
-## Arduino toolchain (optional, for checking generated sketches)
+## Arduino toolchain
 
-With these installed, the test suite compiles the generated sketch for a real Uno; without
-them that one test skips itself. One command does the lot:
+Installed by `tools\setupToolchain.py` in the one-time setup above; this is what it does and
+how to interrogate it. Without the toolchain the app cannot upload and the sketch compile test
+skips itself; everything else still runs.
+
+The tool ends by **compiling the real sketch** and printing which binary, data directory and
+libraries it used. That is the whole point of it: a pass is evidence about this machine, not
+about a folder somebody looked at once. A missing core once cost a working day because every
+check short of building something insisted it was installed.
 
 ```powershell
-.venv\Scripts\python.exe tools\setupToolchain.py
+.venv\Scripts\python.exe tools\setupToolchain.py --check
 ```
-
-It installs `arduino-cli` through winget if it is missing, fetches the AVR core (a 295 MB
-download, the reason this section exists at all) if that is missing, and then **compiles the
-real sketch** and prints which binary, data directory and libraries it used. That last part is
-the point: a pass is evidence about this machine, not about a folder somebody looked at once.
 
 `--check` reports without installing anything. `--data-dir arduino\.toolchain` keeps the cores
 inside the checkout rather than the machine-wide `Arduino15` folder, which isolates this repo
-completely at the cost of that 295 MB per checkout.
+completely at the cost of that 295 MB per checkout. **Help > Check Toolchain** in the app runs
+the same check and needs no terminal.
 
 By hand, if you would rather:
 
