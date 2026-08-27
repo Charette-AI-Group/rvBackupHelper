@@ -56,6 +56,10 @@ else:
 
 manualPath = programRoot / "docs" / "manual" / "README.md"
 resourcesDir = Path(__file__).resolve().parent / "resources"
+# Drawn by tools/makeIcons.py, never by hand. Carried inside the package so a
+# frozen build gets it with everything else; the application checks it exists
+# rather than assuming, because a missing icon is not worth failing to start.
+iconPath = resourcesDir / "rvBackupHelper.ico"
 windowTitle = appName
 defaultWindowWidth = 1000
 defaultWindowHeight = 700

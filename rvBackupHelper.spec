@@ -72,6 +72,7 @@ executable = EXE(
     [],
     exclude_binaries=True,
     name="rvBackupHelper",
+    icon=str(projectRoot / "src" / "rvBackupHelper" / "resources" / "rvBackupHelper.ico"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -32,6 +32,7 @@ AppSupportURL={#AppUrl}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
+SetupIconFile=..\src\rvBackupHelper\resources\rvBackupHelper.ico
 UninstallDisplayIcon={app}\{#ExeName}
 OutputDir=..\dist
 OutputBaseFilename=rvBackupHelperSetup-{#AppVersion}
