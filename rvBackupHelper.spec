@@ -24,6 +24,14 @@ projectRoot = Path(SPECPATH)
 # user's own generated output, and recordings/ and calibration/, which are
 # theirs as well.
 datas = [
+    # The package's own resources. PyInstaller does not collect package data
+    # on its own, and appConfig.iconPath points inside the package - so
+    # without this the executable wears the icon while the running window
+    # does not, which is a confusing half of the job.
+    (
+        str(projectRoot / "src" / "rvBackupHelper" / "resources"),
+        "rvBackupHelper/resources",
+    ),
     (str(projectRoot / "docs" / "manual"), "docs/manual"),
     (str(projectRoot / "tools" / "checkHardware.ps1"), "tools"),
     (str(projectRoot / "arduino" / "libraries"), "arduino/libraries"),

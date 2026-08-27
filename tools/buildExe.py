@@ -36,6 +36,10 @@ smokeSeconds = 12.0
 # points at in a one-folder build, and therefore what appConfig.programRoot
 # becomes.
 expectedPayload = [
+    # The window icon, which is loaded from the package rather than from the
+    # executable's own resources: those two are separate, and shipping only
+    # the second gives a taskbar tile with a blank window behind it.
+    Path("rvBackupHelper/resources/rvBackupHelper.ico"),
     Path("docs/manual/README.md"),
     Path("tools/checkHardware.ps1"),
     Path("arduino/libraries/TVout/video_gen.cpp"),
