@@ -75,9 +75,15 @@ class CaptureView(QWidget):
         # Labelled with the state, not the action. A checked button is drawn
         # highlighted, and "Hide Grid" highlighted reads as though hiding were
         # already in effect - the opposite of what it means.
-        self.gridToggle = QPushButton(gridOnText)
+        # Starts off. The board keeps the real state in EEPROM and nothing has
+        # asked it yet - opening the port to ask would reset the board, which
+        # is not a thing to do to a running overlay at startup. So the button
+        # cannot know, and of the two guesses this is the one that does not
+        # claim the grid is up when the picture is clean. It corrects itself
+        # on the first toggle, which reports what the board actually said.
+        self.gridToggle = QPushButton(gridOffText)
         self.gridToggle.setCheckable(True)
-        self.gridToggle.setChecked(True)
+        self.gridToggle.setChecked(False)
         self.gridToggle.setToolTip(
             "Blanks the overlay so the camera passes through clean. Needs the "
             "generated grid sketch flashed; takes a moment because opening the "

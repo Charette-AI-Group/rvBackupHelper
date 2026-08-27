@@ -173,12 +173,25 @@ def testGridToggleSitsWithTheRecordingControls(qtbot) -> None:
     view = CaptureView()
     qtbot.addWidget(view)
 
-    assert view.gridToggle.isChecked()
     # Labelled with the state: a checked button is highlighted, and an action
     # label would then read as though the action were already in effect.
-    assert view.gridToggle.text() == gridOnText
+    assert view.gridToggle.text() == gridOffText
     # Usable before any device is found: you blank the grid, then record.
     assert view.gridToggle.isEnabled()
+
+
+def testTheGridButtonStartsOff(qtbot) -> None:
+    """It cannot know: the state lives in the board's EEPROM, and asking
+    resets the board.
+
+    Of the two available guesses, off is the one that does not claim an
+    overlay is up while the picture is clean.
+    """
+    view = CaptureView()
+    qtbot.addWidget(view)
+
+    assert not view.gridToggle.isChecked()
+    assert view.gridToggle.text() == gridOffText
 
 
 def testGridToggleReportsWhatTheBoardActuallySaid(qtbot) -> None:
