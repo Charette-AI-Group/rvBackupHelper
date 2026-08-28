@@ -63,8 +63,20 @@ instructions = (
 # What a click on the picture means. Distance first: it has to exist before an
 # edge has anything to attach to.
 markDistance = "Distance line"
-markLeft = "Left edge"
-markRight = "Right edge"
+# Named for the side of the vehicle, not the side of the picture. "Left edge"
+# is ambiguous the moment anyone stops to think about it - left of the image
+# or left of the RV? - while the sides of a vehicle are not ambiguous to the
+# person standing beside it with a tape measure.
+#
+# It assumes what this rig has: a mirrored camera, so the picture reads like a
+# rear-view mirror and the driver's side stays on the left of the image. An
+# unmirrored camera swaps the two, which is worth knowing before marking.
+markLeft = "Driver side"
+markRight = "Passenger side"
+# The model goes on calling them left and right, because in the frame that is
+# what they are: x coordinates, which is what the sketch draws. Only the words
+# on screen change.
+edgeLabels = {Edge.left: markLeft, Edge.right: markRight}
 
 
 class CalibrationView(QWidget):
@@ -143,7 +155,9 @@ class CalibrationView(QWidget):
 
         self.pointsTable = QTableWidget(0, 5)
         self.pointsTable.setHorizontalHeaderLabels(
-            ["Distance", "Scan line", "OSD row", "Left", "Right"]
+            # Same words as the buttons that fill them; a table still saying
+            # Left and Right would reintroduce the ambiguity one column over.
+            ["Distance", "Scan line", "OSD row", markLeft, markRight]
         )
         self.pointsTable.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.pointsTable.setSelectionBehavior(
@@ -255,7 +269,9 @@ class CalibrationView(QWidget):
             return
         self.calibration.frameIndex = frameIndex
         self.refresh()
-        self.statusMessage.emit(f"Marked the {edge} edge of {distance:g} ft at x={x}.")
+        self.statusMessage.emit(
+            f"Marked the {edgeLabels[edge].lower()} of {distance:g} ft at x={x}."
+        )
 
     def selectedDistance(self) -> float | None:
         row = self.pointsTable.currentRow()

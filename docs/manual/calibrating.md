@@ -61,8 +61,15 @@ its own frame**, because the pole is carried to a new distance for every shot.
 ## Marking the vehicle width
 
 If your pole carries the RV's width marked on it, switch the radio button to
-**Left edge** or **Right edge** and click those markings. A green tick shows
-where each landed.
+**Driver side** or **Passenger side** and click those markings. A green tick
+shows where each landed.
+
+> They name sides of the *vehicle*, not sides of the picture, because "left"
+> answers differently depending on where you are standing. The buttons assume a
+> **mirrored** camera — one whose picture reads like a rear-view mirror, which
+> puts the driver's side on the left of the image. If yours is not mirrored the
+> two are swapped, so settle it once before marking: stand at one rear corner
+> and see which side of the picture you appear on.
 
 **Mark the distance line before its edges** — an edge with no line has nothing
 to attach to, and the application will say so rather than inventing a scan line

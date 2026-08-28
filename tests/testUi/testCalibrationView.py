@@ -131,6 +131,44 @@ def testClickingWithoutAClipIsRefused(view: CalibrationView) -> None:
     assert "Open a clip" in messages[-1]
 
 
+def testTheWidthButtonsNameSidesOfTheVehicleNotSidesOfThePicture(
+    view: CalibrationView,
+) -> None:
+    """Left of the image or left of the RV? A reversing camera answers that
+
+    differently depending on whether it mirrors, and somebody standing at the
+    back with a tape measure should not have to work it out.
+    """
+    labels = [button.text() for button in view.markGroup.buttons()]
+
+    assert labels == ["Distance line", "Driver side", "Passenger side"]
+
+
+def testTheTableUsesTheSameWordsAsTheButtons(view: CalibrationView) -> None:
+    """Two vocabularies one column apart would put the ambiguity straight back."""
+    headers = [
+        view.pointsTable.horizontalHeaderItem(column).text()
+        for column in range(view.pointsTable.columnCount())
+    ]
+
+    assert headers[3:] == ["Driver side", "Passenger side"]
+
+
+def testTheMarkedMessageSaysWhichSideOfTheVehicle(
+    viewWithClip: CalibrationView,
+) -> None:
+    messages: list[str] = []
+    viewWithClip.statusMessage.connect(messages.append)
+    viewWithClip.distanceSpin.setValue(3.0)
+    viewWithClip.onFramePointClicked(320, 420)
+    viewWithClip.markGroup.button(1).setChecked(True)
+
+    viewWithClip.onFramePointClicked(120, 420)
+
+    assert "driver side" in messages[-1]
+    assert "edge" not in messages[-1]
+
+
 def testTableAndMarkersFollowThePoints(viewWithClip: CalibrationView) -> None:
     viewWithClip.distanceSpin.setValue(6.0)
     viewWithClip.onFramePointClicked(320, 360)
