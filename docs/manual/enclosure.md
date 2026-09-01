@@ -162,10 +162,12 @@ or two of picture before the grid appears, while the sketch boots and TVout
 allocates its 1632-byte buffer.
 
 Do not run the Uno from the RV rail directly. A charging rail sits at
-13.8–14.8 V and carries transients well above that. The chain is:
+13.8–14.8 V and carries transients well above that. [The reason this is not
+optional](#why-not-feed-it-the-12-v-rail-directly) is at the end of this
+section, and it is not the one most people expect. The chain is:
 
 ```
-   12 V tap ──▶ 500 mA fuse ──▶ TVS (SMBJ16CA) ──▶ R-78E9.0-0.5 ──▶ VIN
+   12 V tap ──▶ 500 mA fuse ──▶ TVS (SMBJ16CA) ──▶ R-78E9.0-0.5 ──▶ barrel jack
 ```
 
 The **TVS** — transient voltage suppressor — is the part that does nothing at
@@ -182,11 +184,93 @@ milliseconds.
 > means it clamps transients of either polarity, which is worth having in a
 > vehicle. It does not mean you can wire the 12 V tap backwards — do that and
 > the TVS conducts continuously and burns, and you are relying on the fuse
-> blowing first. Guarding against actually miswiring it needs a series Schottky
-> or a P-FET, which is a different part.
+> blowing first. Guarding against that is the barrel jack's job, below.
 
-The R-78E accepts up to 28 V in and needs no heatsink. It also keeps the Uno's
-own linear regulator from turning the difference into heat inside a sealed box.
+The R-78E accepts up to 28 V in and needs no heatsink.
+
+### What the Arduino needs at the jack
+
+| | Voltage |
+|---|---|
+| Absolute limits | 6–20 V |
+| Recommended | 7–12 V |
+| This build | **9 V** |
+
+The floor is set by the dropout of the Uno's own NCP1117 linear regulator, not
+by anything digital. Below about 7 V it can no longer hold a true 5 V, the rail
+sags, and the board misbehaves in ways that look like a shield fault rather than
+a power fault. The ceiling is purely thermal: the NCP1117 burns the whole
+difference between its input and 5 V as heat, in a small package on a small
+copper pad.
+
+That is why this runs at 9 V rather than 12 V, and it matters more here than on
+a desk because the box is sealed. Taking the Uno and the shield together at
+roughly 100 mA:
+
+```
+   at  9 V:  (9 - 5) x 0.1 = 0.4 W burnt in the regulator
+   at 12 V:  (12 - 5) x 0.1 = 0.7 W
+```
+
+Behind a dash in summer the air in that box can be near 50 °C before the Arduino
+heats anything at all. 0.4 W is comfortable there; 0.7 W is not. 9 V also leaves
+real margin above the 7 V floor, which 7.5 V would not once regulator tolerance
+and rail droop are allowed for.
+
+> **Feed the barrel jack, not the VIN pin.** The jack's path to VIN runs through
+> a series reverse-protection diode; the VIN pin bypasses it. The ~0.7 V that
+> diode costs is irrelevant at 9 V — the regulator still sees about 8.3 V — and
+> it buys protection against the one failure the TVS does not cover. Reverse the
+> polarity into the barrel jack and the diode simply blocks.
+
+The other common approach is a 5 V converter wired straight to the 5 V pin,
+skipping the on-board regulator for better efficiency. Avoid it here. That pin
+has no protection ahead of it at all, so a converter that fails high puts
+unregulated volts directly onto the ATmega.
+
+### Why not feed it the 12 V rail directly
+
+A fair question, because 12 V is inside the Uno's recommended range. On a bench,
+in open air, off a bench supply, connecting it directly is fine. In the vehicle
+it is not, and the reason that settles it is not heat.
+
+**The numbers leave no room for a TVS.** Work through what a protection diode
+would have to do if the Arduino were the first thing on the rail:
+
+| | |
+|---|---|
+| Rail while charging | up to 14.8 V — the TVS must ignore this |
+| So the lowest usable standoff | 16 V |
+| Which breaks down at | 17.8–19.7 V |
+| And clamps at up to | **26 V** |
+| NCP1117 absolute maximum input | **20 V** |
+
+The clamp sits above the part it is supposed to protect. That is not fixed by
+choosing a better TVS: the window between *must stay dormant at 14.8 V* and
+*must hold below 20 V* is too narrow for any TVS to occupy, because a TVS clamps
+well above its own breakdown voltage once real surge current flows through it.
+There is no arrangement in which a diode alone protects the Uno's own regulator
+on an RV rail.
+
+The R-78E is what closes that gap. Rated to 28 V in, it sits above the 26 V
+clamp, which finally gives the TVS something it can protect. The buck regulator
+is not a convenience in this chain — it is the part that makes the protection
+scheme valid at all.
+
+**Heat is the second reason, and the weaker one.** The rail is not 12 V, it is
+13.8–14.8 V while charging, so a direct connection runs at or past the top of
+the recommended range continuously, inside a sealed box:
+
+```
+   at 14.4 V:  (14.4 - 5) x 0.1 = 0.94 W burnt in the NCP1117
+```
+
+For a SOT-223 on the Uno's modest copper pour, in air that can already sit near
+50 °C behind a dash, that is marginal at best and can be expected to reach
+thermal shutdown in summer. Treat the figure as an estimate rather than a
+measurement — the current draw is approximate and the Uno's thermal resistance
+is not published — but it points the same way as the argument above, which does
+not depend on any estimate.
 
 ## Mounting and vibration
 
