@@ -2,6 +2,19 @@
 
 RV backup camera video capture, grid calibration and OSD overlay tooling
 
+## Install
+
+[**Download a release**](https://github.com/Charette-AI-Group/rvBackupHelper/releases) and run
+`rvBackupHelperSetup-*.exe`. Python is not required — the interpreter is bundled — and the
+install is per-user, so there is no UAC prompt and nothing lands in Program Files. The current
+build, `v0.1.0`, is marked a pre-release; it is the first packaged one and has not been installed
+anywhere but here.
+
+It is unsigned, so SmartScreen warns the first time: **More info**, then **Run anyway**. What the
+wizard asks, and why it asks in that order, is under [Making an installer](#making-an-installer).
+
+Everything below is the from-source path, which is what you want if you intend to change the code.
+
 ## One-time setup
 
 Written for a machine with nothing on it. Three things get installed; the repository and the
@@ -239,6 +252,11 @@ Missing hardware warns and asks; it does not block. Calibrating footage and gene
 need no board and no grabber, so refusing to install would turn a warning into a lie. If winget
 is absent — Windows Sandbox has none, nor do LTSC and many managed builds — the arduino-cli
 step is skipped and setup says so at the end rather than failing mid-install.
+
+The built `dist\rvBackupHelperSetup-<version>.exe` is what gets attached to a
+[GitHub release](https://github.com/Charette-AI-Group/rvBackupHelper/releases), which is how it
+reaches a machine that is not this one. Keep `AppVersion` in the `.iss` and `version` in
+`pyproject.toml` in step with the tag.
 
 ### Trying it as somebody who has nothing
 
