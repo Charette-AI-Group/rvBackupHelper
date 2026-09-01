@@ -8,4 +8,7 @@ import os
 # __init__: OpenCV reads the level once, at import time.
 os.environ.setdefault("OPENCV_LOG_LEVEL", "ERROR")
 
-__version__ = "0.1.0"
+# The one place the version is written. appConfig re-exports it for the About
+# box, and pyproject reads it from here, so a release cannot bump one and
+# leave another behind - which is exactly what 0.1.1 did.
+__version__ = "1.0.0"

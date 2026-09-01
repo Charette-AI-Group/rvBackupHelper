@@ -35,7 +35,10 @@ scan line means nothing without knowing what height it was measured in.
 ![The Calibrate tab with no clip open](images/calibrate-tab-empty.png)
 
 The left is a clip browser: **Open Clip…**, the picture, and a transport with a
-slider, a frame box and Previous/Next. The right is the measurement panel.
+slider, a frame box and Previous/Next. **Your Files**, opposite Open Clip,
+opens the folder holding your clips, calibrations and logs — the same one the
+About box names, which in an installed build is under `AppData` where you
+would not think to look. The right is the measurement panel.
 
 Open the clip you recorded and step to a frame where the pole is readable.
 

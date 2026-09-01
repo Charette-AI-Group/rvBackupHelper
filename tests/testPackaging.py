@@ -115,3 +115,14 @@ def testTheInstalledAdviceDoesNotPointAtAToolThatIsNotThere(monkeypatch) -> None
 
     assert "setupToolchain.py" not in advice
     assert "arduino-cli core install arduino:avr" in advice
+
+
+def testTheInstallerCarriesTheSameVersionAsTheApplication() -> None:
+    """Inno cannot read the Python one, so this is what keeps them in step.
+
+    Everything on the Python side now derives from a single literal, but the
+    .iss has to repeat it - and a setup executable named after one version
+    while the About box claims another is the kind of thing nobody notices
+    until somebody reports a bug against the wrong build.
+    """
+    assert f'#define AppVersion "{appConfig.appVersion}"' in installerText

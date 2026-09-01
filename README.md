@@ -4,11 +4,9 @@ RV backup camera video capture, grid calibration and OSD overlay tooling
 
 ## Install
 
-[**Download a release**](https://github.com/Charette-AI-Group/rvBackupHelper/releases) and run
-`rvBackupHelperSetup-*.exe`. Python is not required — the interpreter is bundled — and the
-install is per-user, so there is no UAC prompt and nothing lands in Program Files. The current
-build, `v0.1.0`, is marked a pre-release; it is the first packaged one and has not been installed
-anywhere but here.
+[**Download the latest release**](https://github.com/Charette-AI-Group/rvBackupHelper/releases/latest)
+and run `rvBackupHelperSetup-1.0.0.exe`. Python is not required — the interpreter is bundled —
+and the install is per-user, so there is no UAC prompt and nothing lands in Program Files.
 
 It is unsigned, so SmartScreen warns the first time: **More info**, then **Run anyway**. What the
 wizard asks, and why it asks in that order, is under [Making an installer](#making-an-installer).
@@ -91,6 +89,16 @@ A step-by-step walkthrough with screenshots lives in
 [`docs/manual/`](docs/manual/README.md): the hardware rig, recording behind the
 RV, calibrating, and generating and flashing the sketch. The notes below are the
 quick reference.
+
+The two screenshots that need nothing but the application — the About box, which
+carries the version, and the empty Calibrate tab — are redrawn rather than
+retaken:
+
+```powershell
+.venv\Scripts\python.exe tools\makeManualShots.py
+```
+
+The rest show real footage and a real grabber, so they are still taken by hand.
 
 ## Using the app
 

@@ -1,6 +1,6 @@
 [project]
 name = "rv-backup-helper"
-version = "0.1.1"
+dynamic = ["version"]
 description = "RV backup camera video capture, grid calibration and OSD overlay tooling"
 requires-python = ">=3.14"
 dependencies = [
@@ -47,6 +47,9 @@ select = ["E", "F", "I", "UP"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/rvBackupHelper/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rvBackupHelper"]

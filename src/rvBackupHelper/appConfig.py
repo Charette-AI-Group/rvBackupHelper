@@ -6,8 +6,10 @@ import os
 import sys
 from pathlib import Path
 
+from rvBackupHelper import __version__
+
 appName = "RV Backup Helper"
-appVersion = "0.1.1"
+appVersion = __version__
 organizationName = "Charette AI Group"
 
 # Help > About contents
