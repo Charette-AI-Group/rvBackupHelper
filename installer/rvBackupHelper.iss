@@ -66,6 +66,18 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#ExeName}"; Tasks: desktopic
 
 [Run]
 Filename: "{code:GetWinget}"; Parameters: "install --id ArduinoSA.CLI --exact --accept-package-agreements --accept-source-agreements"; StatusMsg: "Installing arduino-cli..."; Flags: runhidden waituntilterminated; Check: ShouldInstallArduinoCli
+; arduino-cli refreshes its package index only when it does not already have
+; one. A machine carrying an Arduino15 folder from an older Arduino install has
+; an index that predates the builtin tools package, so ctags and the port
+; discoveries cannot be resolved at all - and arduino-cli reports them "not
+; found" rather than fetching them. Refreshing costs 110 KB and is what makes
+; the two lines below able to install anything.
+Filename: "{code:GetArduinoCli}"; Parameters: "core update-index"; StatusMsg: "Refreshing the Arduino package index..."; Flags: runhidden waituntilterminated; Check: HaveArduinoCli
+; Deliberately not gated on the avrcore task. The builtin tools are about 8 MB
+; and are not the 295 MB core; a machine that already has a core needs them
+; just as much as one that is about to download one, and this is the cheapest
+; command that makes arduino-cli notice they are missing.
+Filename: "{code:GetArduinoCli}"; Parameters: "core list"; StatusMsg: "Fetching the Arduino builtin tools (about 8 MB)..."; Flags: runhidden waituntilterminated; Check: HaveArduinoCli
 Filename: "{code:GetArduinoCli}"; Parameters: "core install {#CoreName}"; StatusMsg: "Downloading the Arduino AVR compiler (about 295 MB) - this takes a few minutes..."; Flags: runhidden waituntilterminated; Tasks: avrcore; Check: HaveArduinoCli
 Filename: "{app}\{#ExeName}"; Description: "Start {#AppName}"; Flags: nowait postinstall skipifsilent
 

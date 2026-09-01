@@ -246,7 +246,12 @@ The wizard is ordered so everything cheap happens before anything expensive:
    plugging things in without restarting the wizard.
 2. **The application**, per-user, so no UAC prompt and no Program Files.
 3. **`arduino-cli`**, via winget, only if it is not already there.
-4. **The AVR core**, last, as a **tick box** — 295 MB, and only uploading needs it.
+4. **The package index and arduino-cli's own tools**, always. ctags and the port
+   discoveries are not part of the core and are not the 295 MB; arduino-cli fetches them
+   itself, but only for an index that describes them. A machine carrying an `Arduino15`
+   folder from an older Arduino install has one that does not, and reports them missing
+   instead of downloading them — so the index is refreshed first, whatever else is ticked.
+5. **The AVR core**, last, as a **tick box** — 295 MB, and only uploading needs it.
 
 Missing hardware warns and asks; it does not block. Calibrating footage and generating a sketch
 need no board and no grabber, so refusing to install would turn a warning into a lie. If winget
