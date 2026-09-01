@@ -18,7 +18,9 @@ from pathlib import Path
 
 from rvBackupHelper import appConfig
 from rvBackupHelper.services.board.uploadService import (
+    builtinToolsAdvice,
     findArduinoCli,
+    looksLikeMissingBuiltinTools,
     toolchainEnvironment,
 )
 
@@ -199,7 +201,10 @@ class ToolchainService:
             tail = "\n".join(output.splitlines()[-6:])
             lines.append("")
             lines.append(f"The compiler said:\n{tail}")
-            if "platform not installed" in output.lower():
+            if looksLikeMissingBuiltinTools(output):
+                lines.append("")
+                lines.append(builtinToolsAdvice())
+            elif "platform not installed" in output.lower():
                 lines.append("")
                 lines.append(
                     f"The {self.coreName()} core is missing from the directory above. "

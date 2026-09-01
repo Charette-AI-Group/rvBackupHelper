@@ -48,6 +48,43 @@ def toolchainEnvironment() -> dict[str, str]:
     return environment
 
 
+# ctags and the port discoveries are arduino-cli's own "builtin tools", not
+# part of the AVR core and not installed by anything here. arduino-cli fetches
+# them itself, the first time a command needs them, which means a machine that
+# was offline at that moment - or that could not read the package index - ends
+# up with the core present and these absent. What the compiler prints then is
+# an unexpanded {runtime.tools.ctags.path}, which reads as a corrupt install
+# rather than as a download that never happened.
+builtinToolFailureMarkers = (
+    "runtime.tools.ctags.path",
+    "builtin:serial-discovery not found",
+    "builtin:mdns-discovery not found",
+    "builtin:ctags not found",
+)
+
+
+def looksLikeMissingBuiltinTools(output: str) -> bool:
+    lowered = output.lower()
+    return any(marker in lowered for marker in builtinToolFailureMarkers)
+
+
+def builtinToolsAdvice() -> str:
+    """The repair, which is neither reinstalling the app nor the 295 MB core."""
+    core = appConfig.boardFqbn.rsplit(":", 1)[0]
+    return (
+        "arduino-cli's own tools are missing: ctags, which preprocesses the "
+        "sketch, and the discoveries that find the port. They do not come with "
+        "the core, and nothing here installs them on purpose - arduino-cli "
+        "fetches them when it first needs them. So this is a download that did "
+        "not happen, not something installed wrongly."
+        "\n\nWith this machine online, in a terminal:"
+        "\n    arduino-cli core update-index"
+        f"\n    arduino-cli core install {core}"
+        "\n\nThe second one re-fetches only what is missing. It will report the "
+        "core as already installed and will not download it again."
+    )
+
+
 class UploadService:
     """Runs arduino-cli compile --upload against a sketch folder."""
 
@@ -166,6 +203,14 @@ class UploadService:
             f"Using: {cli}\n"
             f"Data directory: {self.dataDirectory(cli)}"
         )
+        if looksLikeMissingBuiltinTools(output):
+            dataDir = self.dataDirectory(cli)
+            message += (
+                f"\n\n{builtinToolsAdvice()}"
+                f"\n\nBuiltin tools found in {dataDir}:\n"
+                f"{self.builtinToolsOnDisk(dataDir)}"
+            )
+            return message
         if "platform not installed" in output.lower():
             # What this process can see, rather than advice about what to try:
             # if the core is listed here the installation is not the problem,
@@ -178,6 +223,23 @@ class UploadService:
                 f"\n{self.arduinoEnvironment()}"
             )
         return message
+
+    def builtinToolsOnDisk(self, dataDir: str) -> str:
+        """Which builtin tools exist, so "missing" is a fact and not a guess.
+
+        Naming the ones that are present matters as much as the ones that are
+        not: a partial set points at a download interrupted halfway, an empty
+        one at a download that never started, and those are the same fix but
+        not the same story.
+        """
+        tools = Path(dataDir) / "packages" / "builtin" / "tools"
+        try:
+            if not tools.is_dir():
+                return f"{tools} does not exist - none of them were ever installed"
+            found = sorted(path.name for path in tools.iterdir() if path.is_dir())
+        except OSError as exc:
+            return f"{tools} could not be read: {exc}"
+        return ", ".join(found) if found else f"{tools} is empty"
 
     def installedCores(self, cli: str) -> str:
         """What 'core list' reports for this process. Never raises."""

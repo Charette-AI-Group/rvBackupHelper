@@ -273,3 +273,71 @@ def testTheDataDirectoryQueryNeverMasksTheRealFailure(sketchDir: Path) -> None:
     message = str(caught.value)
     assert "was not declared" in message
     assert "could not be determined" in message
+
+
+# The failure a machine gives when arduino-cli never managed to fetch its own
+# tools: the core is there, the platform loads far enough to start a build, and
+# then ctags is a placeholder nobody expanded.
+missingBuiltinToolsOutput = (
+    "Error initializing instance: Error loading hardware platform: "
+    "discovery builtin:serial-discovery not found\n"
+    "Error initializing instance: Error loading hardware platform: "
+    "discovery builtin:mdns-discovery not found\n"
+    'Error during build: exec: "{runtime.tools.ctags.path}/ctags": '
+    "executable file not found in %PATH%"
+)
+
+
+def testMissingBuiltinToolsAreNamedAsADownloadThatDidNotHappen(sketchDir: Path) -> None:
+    # Raw, this failure reads as a corrupt installation, and the reader's first
+    # move is to reinstall the application - which touches none of it. Say what
+    # is actually absent and which command fetches it.
+    runner = FailingBuildRunner(missingBuiltinToolsOutput)
+    service = serviceWith(runner)
+
+    with pytest.raises(UploadError) as caught:
+        service.upload(sketchDir)
+
+    message = str(caught.value)
+    assert "ctags" in message
+    assert "arduino-cli core install arduino:avr" in message
+    assert "Builtin tools found in" in message
+
+
+def testMissingBuiltinToolsDoNotSendTheReaderAfterTheCore(sketchDir: Path) -> None:
+    # The core is installed. Offering the core diagnostics here would point at
+    # the 295 MB download, which is the one thing that is not the problem.
+    runner = FailingBuildRunner(missingBuiltinToolsOutput)
+    service = serviceWith(runner)
+
+    with pytest.raises(UploadError) as caught:
+        service.upload(sketchDir)
+
+    assert "Cores visible to this process:" not in str(caught.value)
+
+
+def testAMissingCoreIsStillReportedAsAMissingCore(sketchDir: Path) -> None:
+    # The guard on the branch above: both failures mention the platform, so a
+    # missing core must not be swallowed by the builtin-tools explanation.
+    runner = FailingBuildRunner(
+        "Error during build: Platform 'arduino:avr' not found: platform not installed"
+    )
+    service = serviceWith(runner)
+
+    with pytest.raises(UploadError) as caught:
+        service.upload(sketchDir)
+
+    assert "arduino-cli core update-index" not in str(caught.value)
+
+
+def testTheBuiltinToolListingDistinguishesPartialFromAbsent(tmp_path: Path) -> None:
+    # A half-populated folder means an interrupted download; a missing one means
+    # it never began. Same fix, different story, so the report separates them.
+    tools = tmp_path / "packages" / "builtin" / "tools"
+    (tools / "ctags").mkdir(parents=True)
+
+    partial = UploadService().builtinToolsOnDisk(str(tmp_path))
+    absent = UploadService().builtinToolsOnDisk(str(tmp_path / "elsewhere"))
+
+    assert partial == "ctags"
+    assert "does not exist" in absent
