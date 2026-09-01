@@ -1,0 +1,446 @@
+/* RV Backup Helper site - self-contained, no external fonts, no framework,
+   no CDN. What is committed here is exactly what gets served.
+
+   The design system is shared with the pySPWB and CloakClip sites so the
+   Charette AI Group applications read as siblings; only the accent changes.
+   Here it is amber, taken from the guide colour the Calibrate tab draws with
+   (videoDisplay.py, #ffd166) - which is also the colour every vehicle already
+   uses to mean "watch out behind you".
+
+   Amber is bright, so the accent splits into two tokens rather than one:
+   --accent for text and tags, --btn-* for filled buttons. A filled amber
+   button needs dark text in dark mode and white text in light mode, and one
+   token cannot say both without dropping a contrast ratio below 4.5:1. */
+
+:root {
+  --accent: #b45309;
+  --accent-strong: #92400e;
+  --accent-soft: rgba(180, 83, 9, 0.09);
+  --btn-bg: #b45309;
+  --btn-bg-strong: #92400e;
+  --btn-fg: #ffffff;
+  /* Dark green, kept dark enough in both themes that white text stays
+     comfortably above the 4.5:1 contrast minimum. */
+  --donate: #15803d;
+  --donate-strong: #166534;
+  --bg: #ffffff;
+  --bg-alt: #faf8f5;
+  --bg-code: #f4f2ef;
+  --text: #22201d;
+  --text-muted: #625d56;
+  --border: #e8e4de;
+  --shadow: 0 1px 2px rgba(35, 30, 25, 0.05), 0 8px 24px rgba(35, 30, 25, 0.07);
+  --radius: 10px;
+  --maxWidth: 1120px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #f5b642;
+    --accent-strong: #ffca63;
+    --accent-soft: rgba(245, 182, 66, 0.13);
+    --btn-bg: #f0b232;
+    --btn-bg-strong: #ffc352;
+    --btn-fg: #1f1e1b;
+    --donate: #15803d;
+    --donate-strong: #1a9e4b;
+    --bg: #16151a;
+    --bg-alt: #1c1b21;
+    --bg-code: #211f27;
+    --text: #ece9e4;
+    --text-muted: #a8a39b;
+    --border: #302d36;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { line-height: 1.25; margin: 0 0 .5em; font-weight: 650; }
+h2 { font-size: 1.65rem; margin-top: 0; letter-spacing: -0.01em; }
+h3 { font-size: 1.15rem; margin-top: 2rem; }
+h4 { font-size: 1rem; margin-top: 1.5rem; color: var(--text); }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+ul, ol { margin: 0 0 1rem; padding-left: 1.25rem; }
+li { margin-bottom: .45rem; }
+strong { font-weight: 650; }
+
+code, kbd {
+  font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
+  font-size: .875em;
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: .12em .4em;
+}
+kbd { font-weight: 600; }
+
+img { max-width: 100%; height: auto; }
+
+.wrap { max-width: var(--maxWidth); margin: 0 auto; padding: 0 24px; }
+
+/* ---------------------------------------------------------------- nav -- */
+
+.siteNav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.siteNav .wrap {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 62px;
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 650; color: var(--text); }
+.brand:hover { text-decoration: none; }
+.brand img { width: 26px; height: 26px; border-radius: 6px; }
+.navLinks { display: flex; gap: 20px; margin-left: auto; align-items: center; }
+.navLinks a { color: var(--text-muted); font-size: .93rem; }
+.navLinks a:hover { color: var(--accent); text-decoration: none; }
+
+@media (max-width: 940px) {
+  .navLinks a:not(.btnSmall) { display: none; }
+}
+
+/* Two buttons plus the brand do not fit a phone at full length, and the
+   label would wrap to two lines inside the button. */
+@media (max-width: 520px) {
+  .wideOnly { display: none; }
+  .navLinks { gap: 10px; }
+}
+
+/* -------------------------------------------------------------- hero --- */
+
+.hero { padding: 72px 0 56px; border-bottom: 1px solid var(--border); }
+.heroGrid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 48px; align-items: center; }
+.heroIcon { width: 76px; height: 76px; border-radius: 18px; margin-bottom: 20px; box-shadow: var(--shadow); }
+.hero h1 { font-size: 2.9rem; letter-spacing: -0.025em; margin-bottom: .35em; }
+.heroLead { font-size: 1.18rem; color: var(--text-muted); margin-bottom: 1.75rem; }
+
+/* The hero picture is the shield's own one-bit output on a black field, so it
+   gets the dark mat it was drawn against rather than a white page edge. */
+.heroShot {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: block;
+  width: 100%;
+  background: #000;
+}
+
+@media (max-width: 940px) {
+  .hero { padding: 48px 0 40px; }
+  .heroGrid { grid-template-columns: 1fr; gap: 32px; }
+  .hero h1 { font-size: 2.2rem; }
+}
+
+/* ------------------------------------------------------------ buttons -- */
+
+.btnRow { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+.btn {
+  display: inline-block;
+  padding: 11px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: .95rem;
+  border: 1px solid transparent;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.btn:hover { text-decoration: none; }
+.btnPrimary { background: var(--btn-bg); color: var(--btn-fg); }
+.btnPrimary:hover { background: var(--btn-bg-strong); color: var(--btn-fg); }
+.btnGhost { border-color: var(--border); color: var(--text); background: var(--bg); }
+.btnGhost:hover { border-color: var(--accent); color: var(--accent); }
+.btnSmall {
+  padding: 7px 14px;
+  border-radius: 7px;
+  background: var(--btn-bg);
+  color: var(--btn-fg) !important;
+  font-weight: 600;
+  font-size: .88rem;
+  white-space: nowrap;
+}
+.btnSmall:hover { background: var(--btn-bg-strong); text-decoration: none; }
+.btnDonate { background: var(--donate); color: #fff !important; }
+.btnDonate:hover { background: var(--donate-strong); }
+
+.fineprint { color: var(--text-muted); font-size: .875rem; margin-top: 1rem; }
+
+/* ------------------------------------------------------------ layout --- */
+
+.band { padding: 64px 0; border-bottom: 1px solid var(--border); }
+.band.alt { background: var(--bg-alt); }
+.bandHead { max-width: 760px; margin-bottom: 36px; }
+.bandHead p { color: var(--text-muted); font-size: 1.05rem; margin-bottom: 0; }
+
+/* minmax(0, 1fr) rather than 1fr throughout: a plain 1fr track is
+   minmax(auto, 1fr), so a child with white-space: pre - the wiring
+   diagram, the calibration JSON, the GRID[] table - widens its own track
+   to its longest line and takes the width out of its neighbour. Zero as
+   the minimum hands that overflow to the code block's own scrollbar. */
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+}
+.card h3 { margin: 0 0 .4rem; font-size: 1.02rem; }
+.card p { margin: 0; color: var(--text-muted); font-size: .95rem; }
+
+@media (max-width: 940px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+
+figure { margin: 22px 0; }
+figure img { border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); display: block; }
+figcaption { color: var(--text-muted); font-size: .875rem; margin-top: 10px; }
+
+.note {
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 18px;
+  margin: 22px 0;
+}
+.note p:last-child { margin-bottom: 0; }
+.note strong { color: var(--text); }
+
+table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: .95rem; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-weight: 650; background: var(--bg-alt); }
+.band.alt th { background: var(--bg); }
+.tableScroll { overflow-x: auto; }
+
+/* A screenshot and its explanation, alternating sides down the page. */
+.feature {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 44px;
+  align-items: center;
+  padding: 40px 0;
+  border-bottom: 1px solid var(--border);
+}
+.feature:last-child { border-bottom: 0; }
+.feature.flip .featureText { order: 2; }
+.feature h3 { margin-top: 0; font-size: 1.35rem; }
+.feature p { color: var(--text-muted); }
+.feature img {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: block;
+}
+.featureTag {
+  display: inline-block;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 4px 11px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 940px) {
+  .feature { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 28px 0; }
+  .feature.flip .featureText { order: 0; }
+}
+
+/* Small facts worth stating without a paragraph around each. */
+.factRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  list-style: none;
+}
+.factRow li {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: .88rem;
+  color: var(--text-muted);
+  margin: 0;
+  background: var(--bg);
+}
+
+.codeBlock {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
+  font-size: .9rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  margin: 0 0 1rem;
+  white-space: pre;
+}
+.codeBlock .comment { color: var(--text-muted); }
+
+/* -------------------------------------------------- the walkthrough ---- */
+
+/* The heart of the page. Each step is a numbered rail on the left, the
+   instruction in the middle and the screenshot on the right - one row per
+   step, so the eye can run down the numbers and see how much is left. The
+   rail is a real grid column rather than a badge hung off the text, because
+   a step whose text runs long still needs its connecting line to reach the
+   next number. */
+
+.stepList { counter-reset: rvStep; }
+
+.step {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 0 36px;
+  align-items: start;
+  padding-bottom: 44px;
+}
+
+.stepRail {
+  counter-increment: rvStep;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-self: stretch;
+}
+.stepRail::before {
+  content: counter(rvStep);
+  position: relative;
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  font-size: 1.05rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+/* The line joining one number to the next. Not drawn under the last step. */
+.stepRail::after {
+  content: "";
+  position: absolute;
+  top: 46px;
+  bottom: -44px;
+  width: 2px;
+  background: var(--border);
+}
+.step:last-child .stepRail::after { display: none; }
+
+.stepBody h3 { margin: 6px 0 .5rem; font-size: 1.2rem; }
+.stepBody p { color: var(--text-muted); }
+.stepBody p:last-child { margin-bottom: 0; }
+.stepBody .note p { color: var(--text); }
+.stepBody .codeBlock { color: var(--text); }
+.stepWhere {
+  display: inline-block;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 4px 11px;
+  margin-bottom: 2px;
+}
+
+.stepShot { margin: 6px 0 0; }
+.stepShot img {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: block;
+}
+.stepShot img.onBlack { background: #000; }
+.stepShot figcaption { margin-top: 10px; }
+
+/* No screenshot for this step: the middle column takes the whole width so a
+   step about wiring or a shell command does not sit in a half-empty row. */
+.step.wide .stepBody { grid-column: 2 / 4; }
+
+@media (max-width: 940px) {
+  .step {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 0 20px;
+    padding-bottom: 34px;
+  }
+  .stepRail::before { width: 34px; height: 34px; font-size: .95rem; }
+  .stepRail::after { top: 40px; bottom: -34px; }
+  .stepShot { grid-column: 2; }
+  .step.wide .stepBody { grid-column: 2; }
+}
+
+/* -------------------------------------------------------- download ----- */
+
+.downloadGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; margin-bottom: 8px; }
+.downloadCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 26px;
+  background: var(--bg);
+}
+.downloadCard h3 { margin-top: 0; }
+.downloadCard p { color: var(--text-muted); font-size: .95rem; }
+.downloadCard .platform {
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.downloadCard .size { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 940px) { .downloadGrid { grid-template-columns: minmax(0, 1fr); } }
+
+/* The documentation index: a link list that still reads as a grid. */
+.docsGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.docsCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  background: var(--bg);
+}
+.docsCard h3 { margin: 0 0 .5rem; font-size: 1.02rem; }
+.docsCard ul { margin: 0; padding-left: 1.1rem; }
+.docsCard li { margin-bottom: .35rem; font-size: .95rem; }
+.docsCard p { color: var(--text-muted); font-size: .95rem; margin: 0 0 .6rem; }
+
+@media (max-width: 940px) { .docsGrid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------------------------------------------------------- donate ----- */
+
+.donate { max-width: 760px; }
+.donate h2 { margin-bottom: .6em; }
+
+/* ---------------------------------------------------------- footer ----- */
+
+.siteFooter { padding: 40px 0; color: var(--text-muted); font-size: .9rem; }
+.siteFooter .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+.siteFooter a { color: var(--text-muted); }
+.siteFooter a:hover { color: var(--accent); }

@@ -2,6 +2,11 @@
 
 RV backup camera video capture, grid calibration and OSD overlay tooling
 
+[**RV Backup Helper on the web**](https://charette-ai-group.github.io/rvBackupHelper/) — what it
+does and why, and the whole job walked through in ten steps with screenshots: a pole laid in the
+driveway at one end, distance lines on the RV's own screen at the other. Start there if you are
+deciding whether to build one; start here if you have decided.
+
 ## Install
 
 [**Download the latest release**](https://github.com/Charette-AI-Group/rvBackupHelper/releases/latest)
@@ -343,6 +348,15 @@ arduino-cli compile --fqbn arduino:avr:uno arduino/rvbhGrid
 | Models | `src/rvBackupHelper/models/` | Plain Python data types |
 
 See `AGENTS.md` for architecture and naming conventions (for you and AI agents).
+
+## Licence
+
+MIT — see [`LICENSE`](LICENSE). That covers this repository's own code, the generated sketches
+and the documentation.
+
+The vendored Video Experimenter fork of TVout in `arduino/libraries` is somebody else's work and
+carries **its own** MIT licence file, kept beside the code as that licence requires. Nothing here
+relicenses it.
 
 ---
 *Created from the Qt App Template.*

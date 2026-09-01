@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RV Backup Helper &mdash; distance lines on an RV backup camera, free for Windows</title>
+  <meta name="description"
+    content="RV Backup Helper puts measured distance lines and a vehicle-width corridor on an RV backup camera that draws none. Record behind your own RV, click the distances, and the app generates and flashes an Arduino sketch that overlays them on the live picture. Free, open source, Windows.">
+  <meta name="author" content="Charette AI Group">
+  <link rel="icon" href="img/icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <nav class="siteNav">
+    <div class="wrap">
+      <a class="brand" href="#top"><img src="img/icon.png" alt="">RV Backup Helper</a>
+      <div class="navLinks">
+        <a href="#who">Who it&rsquo;s for</a>
+        <a href="#how">How it works</a>
+        <a href="#kit">What you need</a>
+        <a href="#steps">Step by step</a>
+        <a href="#docs">Documentation</a>
+        <a class="btnSmall" href="#download">Download<span class="wideOnly"> free</span></a>
+        <a class="btnSmall btnDonate" href="https://www.paypal.com/donate/?hosted_button_id=FEM4WLD7LHY36"
+          target="_blank" rel="noopener">Donate</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ------------------------------------------------------------ hero -->
+  <header class="hero" id="top">
+    <div class="wrap heroGrid">
+      <div>
+        <img class="heroIcon" src="img/icon.png" alt="RV Backup Helper icon">
+        <h1>Distance lines on the RV camera that never had any.</h1>
+        <p class="heroLead">Your backup camera shows a picture and nothing else &mdash; no way to tell whether
+          that post is four feet back or twelve. RV Backup Helper measures <em>your</em> vehicle from
+          <em>your</em> camera once, then generates and flashes an Arduino sketch that draws those distances
+          straight onto the live video.</p>
+        <div class="btnRow">
+          <a class="btn btnPrimary" href="#download">Download free for Windows</a>
+          <a class="btn btnGhost" href="#steps">See the ten steps</a>
+        </div>
+        <p class="fineprint">Version 1.0.0 &middot; Windows 10 and 11 &middot; Python is bundled, nothing
+          else to install &middot; MIT licensed, no account, no telemetry</p>
+      </div>
+      <div>
+        <img class="heroShot" src="img/overlay-preview.png"
+          alt="The overlay the shield draws: white horizontal lines labelled 0, 1, 2, 4, 8, 12, 16, 20 and 24 feet, each label set into a break in its own line, with a dashed pair of curves marking the width of the RV">
+      </div>
+    </div>
+  </header>
+
+  <!-- ------------------------------------------------------------- who -->
+  <section class="band" id="who">
+    <div class="wrap">
+      <div class="bandHead">
+        <h2>Who this is for</h2>
+        <p>Anyone who reverses something large using a camera that shows distance as well as a mirror does
+          &mdash; which is to say, not at all.</p>
+      </div>
+
+      <div class="cards">
+        <div class="card">
+          <h3>RV and travel-trailer owners</h3>
+          <p>The factory camera came with the coach and the factory display draws nothing on it. This adds
+            the lines without replacing either, and without a trip to an installer.</p>
+        </div>
+        <div class="card">
+          <h3>Anyone backing onto a hitch</h3>
+          <p>The last three feet are the ones that cost money. A 1&nbsp;ft line, drawn heavier than the rest,
+            is the difference between stopping and finding out.</p>
+        </div>
+        <div class="card">
+          <h3>Long overhangs and fifth wheels</h3>
+          <p>A generic sticker-on guideline assumes a vehicle it has never seen. These lines come from a pole
+            laid in your own driveway, behind your own bumper.</p>
+        </div>
+        <div class="card">
+          <h3>Installers and RV techs</h3>
+          <p>One calibration per coach, saved as a small JSON file, regenerated into a sketch in one click.
+            The measurement is the work; everything after it is repeatable.</p>
+        </div>
+        <div class="card">
+          <h3>Makers and Arduino people</h3>
+          <p>An Uno, a Video Experimenter shield and about forty dollars of parts. The generated sketch is
+            plain, commented C you can read, and the whole toolchain is in the repository.</p>
+        </div>
+        <div class="card">
+          <h3>Anyone who was quoted for a new head unit</h3>
+          <p>Replacing a working display to gain guide lines is an expensive way to solve this. The camera
+            and the screen you already own stay exactly where they are.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------- how -->
+  <section class="band alt" id="how">
+    <div class="wrap">
+      <div class="bandHead">
+        <h2>The lines are drawn in the wire, not in a computer</h2>
+        <p>An RV backup camera is analogue composite video &mdash; the same signal television used before
+          HDMI. That is unglamorous, and it is exactly why this works.</p>
+      </div>
+
+      <div class="feature">
+        <div class="featureText">
+          <span class="featureTag">The principle</span>
+          <h3>Slice the sync, add brightness, pass it on</h3>
+          <p>Composite is a single wire carrying brightness and timing together. A chip can lock to that
+            timing and inject extra brightness on top without understanding the picture at all. The trick is
+            old: broadcast character generators did it for captions in the 1970s, and radio-controlled
+            aircraft have used it for decades to put battery voltage over a live camera feed.</p>
+          <p>The alternative &mdash; digitise the video, draw on it, re-encode it &mdash; is easier to write
+            and wrong for this job, because it puts a computer between the driver and the rear view.</p>
+        </div>
+        <div>
+          <div class="codeBlock">   RV camera ──▶ <span class="comment">Video Input</span> ─┤ shield ├─ <span class="comment">Video Output</span> ──▶ display
+
+   Signal in, overlay mixed in, signal out.
+   Nothing is decoded, buffered or re-encoded.</div>
+          <div class="note">
+            <p><strong>When it fails, it fails to nothing.</strong> The overlay adds no stage to the signal
+              path. If the board dies, the camera passes straight through and the driver simply sees no
+              lines &mdash; not a frozen frame, not a blank screen.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature flip">
+        <div class="featureText">
+          <span class="featureTag">The measurement</span>
+          <h3>Measured behind your bumper, not guessed from a template</h3>
+          <p>A calibration is nothing more than a short list of correspondences between the real world and
+            the picture: <em>at 4&nbsp;ft behind the bumper the ground appears on scan line 241, and the RV is
+            as wide as the picture from column 437 to column 138.</em></p>
+          <p>The width corridor is drawn as a polyline <em>through</em> the points you marked rather than a
+            straight taper, because a wide-angle lens bends what is really a straight path into a curve
+            across the picture. Every extra distance you measure makes that curve truer.</p>
+          <p>The distance lines are deliberately <em>not</em> tapered to suggest perspective. That would
+            imply a width nobody measured.</p>
+        </div>
+        <div>
+          <ul class="factRow">
+            <li>Six or seven distances is enough</li>
+            <li>Each point remembers its own video frame</li>
+            <li>Re-clicking corrects, it does not stack</li>
+            <li>The calibration is a 2&nbsp;kB JSON file</li>
+            <li>The sketch is generated, never hand-edited</li>
+          </ul>
+          <div class="note">
+            <p><strong>The overlay is monochrome, and that is hardware, not taste.</strong> It is one bit
+              per pixel, and NTSC colour would need a subcarrier the microcontroller cannot generate while
+              it is also locking to the camera. Line weight is therefore the only hierarchy available
+              &mdash; which is why the 1&nbsp;ft &ldquo;about to touch something&rdquo; line is drawn
+              double.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------- kit -->
+  <section class="band" id="kit">
+    <div class="wrap">
+      <div class="bandHead">
+        <h2>What you need</h2>
+        <p>Two pieces of hardware do the work in the vehicle, and one dongle borrows the camera onto a PC
+          for an afternoon while you measure.</p>
+      </div>
+
+      <div class="tableScroll">
+        <table>
+          <tr>
+            <th>Part</th>
+            <th>Why, and what to watch</th>
+          </tr>
+          <tr>
+            <td><strong>Arduino Uno R3</strong><br>or Duemilanove</td>
+            <td>Must be an <strong>ATmega328P</strong>. <strong>Not an Uno R4</strong> &mdash; the video
+              library is hand-written AVR assembly and will not run on the R4&rsquo;s Renesas chip. Leonardo
+              and Mega are out too. A clone works, but wants the CH340 driver installed <em>before</em> you
+              leave for the campground.</td>
+          </tr>
+          <tr>
+            <td><strong>Nootropic Design<br>Video Experimenter</strong> shield</td>
+            <td>The overlay hardware itself. It sits on the Uno and carries the sync separator. Two settings
+              on it &mdash; a <code>SYNC SELECT</code> jumper and an <code>OUTPUT SELECT</code> slide switch
+              &mdash; must match the sketch you flash.</td>
+          </tr>
+          <tr>
+            <td><strong>USB video capture dongle</strong></td>
+            <td>Any UVC composite grabber, to record the camera onto the PC for the calibration session.
+              It is not needed once the board is flashed and in the vehicle.</td>
+          </tr>
+          <tr>
+            <td><strong>RCA leads</strong>, and a long pole</td>
+            <td>Composite is one signal wire and a ground. The pole is the measuring instrument: laid across
+              the driveway at each distance, with the RV&rsquo;s width marked on it.</td>
+          </tr>
+          <tr>
+            <td><strong>A Windows PC</strong></td>
+            <td>Windows 10 or 11, for the calibration session and the upload. Nothing about the finished
+              rig needs a computer &mdash; the board runs on its own in the vehicle.</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="note">
+        <p><strong>Check the hardware before you buy the rest of it.</strong> <strong>Help &rarr; Check
+          Hardware</strong> names the board by its USB id &mdash; so an Uno R4, a Leonardo or a Mega is
+          caught by name rather than left to fail at upload &mdash; and says whether a capture device is
+          present. It cannot see the shield, which is passive and enumerates nothing, and it cannot tell a
+          composite camera from an AHD one. That last test still happens at the vehicle.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------------- steps -->
+  <section class="band alt" id="steps">
+    <div class="wrap">
+      <div class="bandHead">
+        <h2>From a driveway to a grid, in ten steps</h2>
+        <p>One afternoon, most of it spent walking a pole backwards and forwards. Steps 1 and 2 are on the
+          bench, 3 to 4 are at the vehicle, and everything from 5 onwards happens at a desk with a recorded
+          clip &mdash; so a misclick costs a click, not another trip outside.</p>
+      </div>
+
+      <div class="stepList">
+
+        <!-- 1 -->
+        <div class="step wide">
+          <div class="stepRail"></div>
+          <div class="stepBody">
+            <span class="stepWhere">On the bench</span>
+            <h3>Put the shield in the camera&rsquo;s video path</h3>
+            <p>The shield sits inline exactly where you originally tapped the camera feed. For the
+              calibration session the output goes to the USB grabber so the PC can record it; in the vehicle
+              it goes to the display instead.</p>
+            <div class="codeBlock">   RV camera ──▶ <span class="comment">Video Input</span> ─┤ shield ├─ <span class="comment">Video Output</span> ──▶ display <span class="comment">or</span> USB grabber</div>
+            <p>Set the shield&rsquo;s two controls for overlay use: the <code>SYNC SELECT</code> jumper on
+              the two <strong>rightmost</strong> pins, so sync is taken from the incoming video, and
+              <code>OUTPUT SELECT</code> on <strong>Overlay</strong>. Leave the small <code>R4</code> pot
+              fully counter-clockwise.</p>
+            <div class="note">
+              <p><strong>A torn or doubled overlay is not broken hardware.</strong> If a pattern appears but
+                drifts, tears, or shows twice, the flashed sketch and the jumpers disagree &mdash; a
+                free-running build slides against incoming video. Flashing the matching build fixes it with
+                no wiring change at all.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2 -->
+        <div class="step wide">
+          <div class="stepRail"></div>
+          <div class="stepBody">
+            <span class="stepWhere">On the bench</span>
+            <h3>Prove the rig before you trust it</h3>
+            <p>Flash <code>arduino/rvbhBringUp/</code> first. It draws a border, three labelled reference
+              rows and the current mode, so that any later problem is known to be in the calibration rather
+              than in the rig.</p>
+            <p>Look for <strong>all four border edges</strong> &mdash; a missing side means the frame buffer
+              is not the size the sketch thinks it is. And watch the on-board LED: a steady blink is the
+              sketch reporting that it could not allocate its frame buffer, so nothing will ever be drawn.
+              It blinks rather than failing silently, because the shield still passes video through and you
+              would otherwise just see no grid and no reason.</p>
+          </div>
+        </div>
+
+        <!-- 3 -->
+        <div class="step">
+          <div class="stepRail"></div>
+          <div class="stepBody">
+            <span class="stepWhere">Capture tab</span>
+            <h3>Find your grabber</h3>
+            <p>Press <strong>Scan Devices</strong>. Devices are listed by their Windows name, so the grabber
+              is easy to tell from a webcam. The scan opens and closes each device in turn, so it takes a few
+              seconds; it runs off the interface thread, so the window stays responsive.</p>
+            <p>A device that opens but is receiving nothing is listed as <strong>no video</strong> rather
+              than hidden &mdash; hover it for the reason. Starting capture on one of those is fine and often
+              correct: the preview says &ldquo;Waiting for video signal&rdquo; and begins the moment video
+              arrives, which is exactly what an RV camera powered only in reverse gear needs.</p>
+            <div class="note">
+              <p><strong>Close OBS first.</strong> Only one application can hold a capture device at a time.
+                With OBS on the grabber, RV Backup Helper opens the device and receives nothing &mdash; while
+                the video is plainly visible in OBS, which makes it look like the app is broken.</p>
+            </div>
+          </div>
+          <figure class="stepShot">
+            <img src="img/capture-tab-scanned.png"
+              alt="The Capture tab after a scan, with USB Video (640x480) chosen in the device list and the status bar reading Found 2 capture device(s)">
+            <figcaption>After the scan: the grabber picked by name, and the status bar counting what it
+              found.</figcaption>
+          </figure>
+        </div>
+
+        <!-- 4 -->
+        <div class="step">
+          <div class="stepRail"></div>
+          <div class="stepBody">
+            <span class="stepWhere">At the vehicle</span>
+            <h3>Turn the grid off, then record</h3>
+            <p><strong>Arduino Grid: On / Off</strong> blanks the shield&rsquo;s overlay so the camera passes
+              through clean. <strong>Record calibration footage with it off</strong> &mdash; a grid burned
+              into the clip sits directly on top of the pole markings you need to click afterwards. That
+              mistake once cost a whole session.</p>
+            <p>Then lay a long pole across the driveway at each distance in turn, with the RV&rsquo;s width
+              marked on it, pausing a few seconds at each so there is a clean frame to find later. Six or
+              seven distances is plenty. Every distance comes from its own frame, and the application records
+              which.</p>
+            <p>It takes a couple of seconds to answer, because opening a serial port resets the Arduino and
+              the board has to boot first. The setting lives in the board&rsquo;s own EEPROM, so it survives
+              that reset, an unplug, and closing the application.</p>
+          </div>
+          <figure class="stepShot">
+            <img src="img/capture-grid-off.png"
+              alt="The Capture tab with the Arduino Grid button reading Off and the status bar reading Arduino says: grid off">
+            <figcaption>The board acknowledging over serial: <em>Arduino says: grid off</em>.</figcaption>
+          </figure>
+        </div>
+
+        <!-- 5 -->
+        <div class="step">
+          <div class="stepRail"></div>
+          <div class="stepBody">
+            <span class="stepWhere">Calibrate tab</span>
+            <h3>Open the clip and step to a readable frame</h3>
+            <p>The left half is a clip browser &mdash; <strong>Open Clip&hellip;</strong>, the picture, and a
+              transport with a slider, a frame box and Previous/Next. A clip you have just recorded is loaded
+              here automatically.</p>
+            <p>Clips are MJPG-encoded, which compresses each frame on its own, so every frame decodes
+              independently and stepping to an exact frame is exact. That matters more here than file size:
+              a calibration measures one specific frame.</p>
+            <p>The cursor becomes a crosshair over the picture, because clicking the picture is how
+              everything here is done.</p>
+          </div>
+          <figure class="stepShot">
+            <img src="img/calibrate-clip-open.jpg"
+              alt="The Calibrate tab with a clip open, showing the driveway behind the RV with a marked pole lying across it, and the transport controls beneath the picture">
+            <figcaption>A clip open at frame 2123 of 6289, with the pole lying at the 4&nbsp;ft
+              position.</figcaption>
+          </figure>
+        </div>
+
+        <!-- 6 -->
+        <div class="step">
+          <div class="stepRail"></div>
+          <div class="stepBody">
+            <span class="stepWhere">Calibrate tab</span>
+            <h3>Click each distance, then the width marks</h3>
+            <p>Set <strong>Distance</strong> to what this pole position represents, leave the radio button on
+              <strong>Distance line</strong>, and click the pole in the picture. An amber guide is drawn where
+              you clicked, so you can see at once whether it landed on the mark. Re-clicking the same distance
+              replaces the earlier point rather than stacking two guides.</p>
+            <p>Then switch to <strong>Left edge</strong> or <strong>Right edge</strong> and click the width
+              markings; a green tick shows where each landed. <strong>Mark the distance line before its
+              edges</strong> &mdash; an edge with no line has nothing to attach to.</p>
+            <p>Step to the next frame and repeat. The table fills in as you go: the distance you typed, the
+              <strong>scan line</strong> you clicked, the <strong>OSD row</strong> that rescales to on the
+              shield&rsquo;s 136&times;96 canvas, and the two width edges.</p>
+            <div class="note">
+              <p><strong>Maximise the window before marking.</strong> Clicks resolve to about a scan line and
+                the picture is scaled to fit, so a bigger picture is a finer measurement. The summary
+                underneath warns if two distances collapse onto the same OSD row &mdash; the capture is
+                several times taller than the shield&rsquo;s canvas, and the hardware cannot draw them
+                apart.</p>
+            </div>
+          </div>
+          <figure class="stepShot">
+            <img src="img/calibrate-complete.jpg"
+              alt="A finished calibration: amber guide lines labelled 0 to 24 feet across the picture, green width ticks on each, and a filled table listing distance, scan line, OSD row and both edges">
+            <figcaption>Nine points measured, all nine with both width edges &mdash; amber for the distance
+              lines, green for the edges.</figcaption>
+          </figure>
+        </div>
+
+        <!-- 7 -->
+        <div class="step wide">
+          <div class="stepRail"></div>
+          <div class="stepBody">
+            <span class="stepWhere">Calibrate tab</span>
+            <h3>Save the calibration</h3>
+            <p><strong>Save&hellip;</strong> writes a small JSON file. Of the three things this process
+              produces, it is the only one that matters: the clip is large and disposable, the sketch is
+              generated in one click, and this cannot be reproduced without another trip to the RV.</p>
+            <div class="codeBlock">{
+  "version": 1,
+  "sourceClip": "2026-08-19_09-39-59.mkv",
+  "frameWidth": 640,
+  "frameHeight": 360,
+  "points": [
+    { "distanceFeet": 4.0, "scanLine": 241, "frameIndex": 2123,
+      "overlayRow": 64, "leftEdge": 437, "overlayLeft": 93,
+      "rightEdge": 138, "overlayRight": 29 }
+  ]
+}</div>
+            <p>The scan line is stored with the frame height it was measured against, because a scan line
+              means nothing without knowing what height it came from. Opening a clip of a different frame
+              size therefore clears the points, deliberately: silently mixing the two would produce a
+              calibration that looks fine and is wrong.</p>
+          </div>
+        </div>
+
+        <!-- 8 -->
+        <div class="step wide">
+          <div class="stepRail"></div>
+          <div class="stepBody">
+            <span class="stepWhere">Calibrate tab</span>
+            <h3>Generate the Arduino sketch</h3>
+            <p><strong>Generate Arduino Sketch&hellip;</strong> turns the measurements into C. Each row
+              carries the scan line and the frame it came from, so a line that looks wrong on the vehicle can
+              be traced back to the moment it was measured.</p>
+            <div class="codeBlock">const GridLine GRID[] PROGMEM = {
+  {  92, 1,   1,  89,  16, gridLabel0 },  <span class="comment">// 0 ft, scan line 346 of 360, frame 441</span>
+  {  86, 2,   1,  83,  16, gridLabel1 },  <span class="comment">// 1 ft, scan line 324 of 360, frame 1001  &lt;- emphasised</span>
+  {  78, 1,   1,  75,  16, gridLabel2 },  <span class="comment">// 2 ft, scan line 294 of 360, frame 1642</span></div>
+            <p>The header carries the rest of the provenance &mdash; source clip, capture size, timestamp,
+              board, library and jumper requirements &mdash; so the file stands on its own if it is ever
+              opened away from the project. Versioning by name works well, because the calibration each
+              sketch was built from is committed alongside it.</p>
+            <div class="note">
+              <p><strong>Never hand-edit a generated sketch.</strong> Regenerating from the JSON is one
+                click, and the file says <code>GENERATED FILE</code> at the top for a reason. Tables and
+                labels live in flash rather than RAM, which is not tidiness: the video frame buffer takes
+                1632 of the Uno&rsquo;s 2048 bytes at run time, and keeping the tables out of RAM is what
+                leaves enough stack to run at all.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 9 -->
+        <div class="step wide">
+          <div class="stepRail"></div>
+          <div class="stepBody">
+            <span class="stepWhere">Calibrate tab</span>
+            <h3>Upload it to the board</h3>
+            <p><strong>Upload to Arduino</strong> compiles and flashes with <code>arduino-cli</code> &mdash;
+              exactly what the IDE&rsquo;s upload button does. <strong>The Arduino IDE is never required.</strong>
+              It takes a few seconds and reports the board&rsquo;s own size summary when it finishes, so you
+              see what actually landed rather than an assumption.</p>
+            <div class="codeBlock">Uploaded to COM3. Sketch uses 7978 bytes (24%) of program storage space.</div>
+            <p>It offers the last sketch you generated, remembered between sessions, so a sketch saved under
+              its own name is still what Upload flashes after a restart. <strong>Help &rarr; Check
+              Toolchain</strong> answers the same question with no board attached, by compiling something and
+              reporting which <code>arduino-cli</code>, data directory and libraries it used &mdash; the
+              compile <em>is</em> the point, because every check short of building something once insisted a
+              missing AVR core was installed.</p>
+          </div>
+        </div>
+
+        <!-- 10 -->
+        <div class="step">
+          <div class="stepRail"></div>
+          <div class="stepBody">
+            <span class="stepWhere">Back in the RV</span>
+            <h3>Turn the grid back on</h3>
+            <p><strong>Arduino Grid &rarr; On</strong>. If you blanked the overlay to record calibration
+              footage, it is still blanked &mdash; and the setting lives in the board&rsquo;s EEPROM, so it
+              survives everything, including a reflash of the same sketch.</p>
+            <p>Move the shield&rsquo;s output back to the display, and that is the job done. Horizontal lines
+              mark your measured distances, each label set <em>into</em> a break in its own line so there is
+              no doubt which belongs to which. The dashed pair is the width of your RV, drawn through the
+              points you marked. The 1&nbsp;ft line is heavier: it is the &ldquo;about to touch
+              something&rdquo; line.</p>
+            <p>Nothing needs a computer from here on. The board runs on its own, and the camera passes
+              through it whether or not the sketch is doing anything.</p>
+          </div>
+          <figure class="stepShot">
+            <img class="onBlack" src="img/overlay-preview.png"
+              alt="The finished overlay: white horizontal lines labelled 0, 1, 2, 4, 8, 12, 16, 20 and 24 feet, with a dashed curved pair marking the RV's width and a heavier line at 1 foot">
+            <figcaption>The overlay buffer the shield draws, rendered from the tables in a generated
+              sketch.</figcaption>
+          </figure>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- limits -->
+  <section class="band" id="limits">
+    <div class="wrap">
+      <div class="bandHead">
+        <h2>What it will not do</h2>
+        <p>Worth reading before you buy a shield, rather than after.</p>
+      </div>
+
+      <ul class="factRow">
+        <li>Windows only</li>
+        <li>Arduino Uno R3 / ATmega328P only</li>
+        <li>Monochrome overlay, 136&times;96</li>
+        <li>Composite cameras, not AHD</li>
+        <li>The installer is unsigned</li>
+        <li>MIT licensed</li>
+      </ul>
+
+      <p style="max-width:820px"><strong>It cannot skip the measuring.</strong> There is no template, no
+        vehicle database and no guess: the lines exist because you laid a pole behind your own bumper and
+        clicked it. That is an afternoon, once, and it is the whole reason the result is worth trusting.</p>
+
+      <p style="max-width:820px"><strong>It is not a proximity sensor and not a warning system.</strong> It
+        draws where the ground was when you measured it, on flat ground. A slope, a kerb, or something
+        hanging above the ground is not what the lines describe. It is a better rear view, not a substitute
+        for using it.</p>
+
+      <p style="max-width:820px"><strong>The application runs on Windows 10 and 11</strong>, because finding
+        and opening capture devices by name goes through DirectShow. The board and the shield, once flashed,
+        have nothing to do with any operating system.</p>
+    </div>
+  </section>
+
+  <!-- -------------------------------------------------------- download -->
+  <section class="band alt" id="download">
+    <div class="wrap">
+      <div class="bandHead">
+        <h2>Download RV Backup Helper 1.0.0</h2>
+        <p>Free. No account, no ads, no telemetry, and the only network call the application ever makes is
+          checking whether the published manual is reachable before it opens it.</p>
+      </div>
+
+      <div class="downloadGrid">
+        <div class="downloadCard">
+          <span class="platform">Windows 10 and 11</span>
+          <h3>Installer</h3>
+          <p><code>rvBackupHelperSetup-1.0.0.exe</code>, <span class="size">about 67&nbsp;MB</span>. Python is
+            bundled, so there is no prerequisite of any kind. The install is <strong>per-user</strong>: no
+            UAC prompt, and nothing lands in Program Files.</p>
+          <p>The wizard runs the hardware check on the page after Welcome, <em>before a single file is
+            written</em>, so somebody with no grabber finds out in five seconds rather than after a
+            download. The 295&nbsp;MB Arduino AVR core is a tick box at the end, and only uploading needs
+            it.</p>
+          <a class="btn btnPrimary"
+            href="https://github.com/Charette-AI-Group/rvBackupHelper/releases/latest">Download for
+            Windows</a>
+        </div>
+        <div class="downloadCard">
+          <span class="platform">From source</span>
+          <h3>Clone and run</h3>
+          <p>What you want if you intend to change the code. Python 3.14 or newer, then one command sets up
+            the Arduino toolchain and <em>proves</em> it by compiling the real sketch.</p>
+          <div class="codeBlock">git clone https://github.com/Charette-AI-Group/rvBackupHelper.git
+cd rvBackupHelper
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.venv\Scripts\python.exe tools\setupToolchain.py</div>
+          <p>The TVout fork the shield needs is committed in <code>arduino/libraries</code> &mdash; there is
+            nothing to install and no wrong version to install by mistake.</p>
+          <a class="btn btnGhost" href="https://github.com/Charette-AI-Group/rvBackupHelper">View the
+            source</a>
+        </div>
+      </div>
+
+      <div class="note">
+        <p><strong>The installer is not code-signed.</strong> Windows shows a SmartScreen warning the first
+          time &mdash; choose <em>More info</em>, then <em>Run anyway</em>. Signing certificates cost money
+          every year, and this is free software. If you would rather not take that on faith, the from-source
+          route above builds the same application out of the same repository.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ docs -->
+  <section class="band" id="docs">
+    <div class="wrap">
+      <div class="bandHead">
+        <h2>Documentation</h2>
+        <p>The walkthrough above is the short version. The manual is five pages with the screenshots, the
+          traps, and the reasoning behind the awkward decisions &mdash; and <kbd>F1</kbd> in the application
+          opens it.</p>
+      </div>
+
+      <div class="docsGrid">
+        <div class="docsCard">
+          <h3>User manual</h3>
+          <ul>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/blob/main/docs/manual/hardware-setup.md">1. Hardware setup</a></li>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/blob/main/docs/manual/capturing-footage.md">2. Capturing footage</a></li>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/blob/main/docs/manual/calibrating.md">3. Calibrating</a></li>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/blob/main/docs/manual/sketch-and-upload.md">4. Sketch and upload</a></li>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/blob/main/docs/manual/enclosure.md">5. Enclosure and vehicle install</a></li>
+          </ul>
+        </div>
+
+        <div class="docsCard">
+          <h3>At the vehicle</h3>
+          <p>What to take, and the order to do it in, on one page.</p>
+          <ul>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/blob/main/docs/rvDayChecklist.md">RV day checklist</a></li>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/tree/main/docs/troubleshooting">Troubleshooting notes</a></li>
+          </ul>
+        </div>
+
+        <div class="docsCard">
+          <h3>Source code</h3>
+          <p>All of it, MIT licensed &mdash; including the sketch generator and the vendored video
+            library, which carries its own MIT licence beside it.</p>
+          <ul>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper">rvBackupHelper on GitHub</a></li>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/blob/main/README.md">README and setup</a></li>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/blob/main/LICENSE">The MIT licence</a></li>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/issues">Issues and questions</a></li>
+          </ul>
+        </div>
+
+        <div class="docsCard">
+          <h3>Releases</h3>
+          <ul>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/releases/latest">Latest release and installer</a></li>
+            <li><a href="https://github.com/Charette-AI-Group/rvBackupHelper/releases">All releases</a></li>
+          </ul>
+        </div>
+
+        <div class="docsCard">
+          <h3>The hardware</h3>
+          <p>Neither of these is ours; both are worth reading before ordering.</p>
+          <ul>
+            <li><a href="https://nootropicdesign.com/ve/" target="_blank" rel="noopener">Video Experimenter shield</a></li>
+            <li><a href="https://store.arduino.cc/products/arduino-uno-rev3" target="_blank" rel="noopener">Arduino Uno R3</a></li>
+          </ul>
+        </div>
+
+        <div class="docsCard">
+          <h3>More from Charette AI Group</h3>
+          <p>Free desktop tools built the same way.</p>
+          <ul>
+            <li><a href="https://charette-ai-group.github.io/pySPWB/">pySPWB &mdash; signal processing</a></li>
+            <li><a href="https://charette-ai-group.github.io/web/">Everything else</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- donate -->
+  <section class="band alt" id="donate">
+    <div class="wrap donate">
+      <h2>Support this work</h2>
+      <p>RV Backup Helper is free and open source. There is no licence to buy, no seat to renew, no account
+        to make, and nothing about you is collected or sent anywhere. That is also why software like this is
+        hard to sustain: there is no subscription to bill and no data to sell, so nothing pays for the work
+        behind it.</p>
+      <p>Most of what is in here came from getting it wrong first &mdash; a whole calibration session lost to
+        a grid left switched on, a working day lost to a video library that compiles perfectly and then
+        answers nothing. Those afternoons are the reason the traps are written down, and the reason the
+        application checks the things it checks.</p>
+      <p>If this saved you a new head unit, an installer&rsquo;s afternoon, or a bumper, please consider
+        chipping in.</p>
+      <div class="btnRow">
+        <a class="btn btnDonate" href="https://www.paypal.com/donate/?hosted_button_id=FEM4WLD7LHY36"
+          target="_blank" rel="noopener">Donate</a>
+      </div>
+      <p class="fineprint">Secure payment through PayPal &mdash; no account required, any amount
+        appreciated. Thank you for supporting independent, open source software.</p>
+    </div>
+  </section>
+
+  <!-- ---------------------------------------------------------- footer -->
+  <footer class="siteFooter">
+    <div class="wrap">
+      <div>&copy; 2026 Charette AI Group, LLC &middot; RV Backup Helper 1.0.0 &middot;
+        <a href="https://github.com/Charette-AI-Group/rvBackupHelper/blob/main/LICENSE">MIT licensed</a>
+      </div>
+      <div>
+        <a href="https://github.com/Charette-AI-Group/rvBackupHelper">Source</a> &middot;
+        <a href="https://github.com/Charette-AI-Group/rvBackupHelper/releases/latest">Releases</a> &middot;
+        <a href="https://github.com/Charette-AI-Group/rvBackupHelper/blob/main/docs/manual/README.md">Manual</a> &middot;
+        <a href="https://charette-ai-group.github.io/web/">More from Charette AI Group</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+
+</html>
