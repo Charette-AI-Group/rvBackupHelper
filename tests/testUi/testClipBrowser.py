@@ -114,3 +114,41 @@ def testOpeningAMissingClipReportsItAndKeepsTheCurrentOne(
 
     assert browser.clipInfo is not None  # still on the good clip
     assert "not found" in messages[-1]
+
+
+def testTheFilesButtonOpensTheFolderTheAboutBoxNames(qtbot) -> None:
+    # The point of the button is that it is the same place, so compare it with
+    # the URI the About box builds rather than with a path spelled out here.
+    opened = []
+    widget = ClipBrowser(opener=lambda url: opened.append(url) or True)
+    qtbot.addWidget(widget)
+
+    widget.filesButton.click()
+
+    assert [url.toString() for url in opened] == [appConfig.userDataDir.as_uri()]
+
+
+def testTheFilesButtonSitsOppositeOpenClip(qtbot) -> None:
+    # Right of the frame, on the same row as Open Clip. Asserted through the
+    # layout because "on the other side" is the whole request.
+    widget = ClipBrowser()
+    qtbot.addWidget(widget)
+    header = widget.layout().itemAt(0).layout()
+
+    positions = [header.itemAt(index).widget() for index in range(header.count())]
+
+    assert positions[0] is widget.openButton
+    assert positions[-1] is widget.filesButton
+
+
+def testARefusedOpenIsReportedRatherThanSilent(qtbot) -> None:
+    # QDesktopServices returns False instead of raising, so without this the
+    # button would look like it had worked.
+    widget = ClipBrowser(opener=lambda url: False)
+    qtbot.addWidget(widget)
+    messages = []
+    widget.statusMessage.connect(messages.append)
+
+    widget.filesButton.click()
+
+    assert messages and "Could not open" in messages[0]

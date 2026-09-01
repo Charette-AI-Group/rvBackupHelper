@@ -10,7 +10,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -44,8 +45,11 @@ class ClipBrowser(QWidget):
     # Payload is the index of the frame now on screen.
     frameShown = Signal(int)
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, opener=None) -> None:
         super().__init__(parent)
+        # Injected so the folder button can be tested without a file
+        # manager opening on whoever is running the suite.
+        self.opener = QDesktopServices.openUrl if opener is None else opener
         self.reader = ClipReaderService()
         self.clipInfo: ClipInfo | None = None
         self.clipPath: Path | None = None
@@ -63,9 +67,19 @@ class ClipBrowser(QWidget):
         self.openButton.clicked.connect(self.onOpenClicked)
         self.clipLabel = QLabel("No clip open")
 
+        # Same folder the About box names under "Your files", and reached the
+        # same way, from the tab where somebody is actually looking for the
+        # clips and calibrations in it. In a frozen build that path is under
+        # AppData and nobody would think to look there; in a checkout it is the
+        # checkout, and the button is merely convenient.
+        self.filesButton = QPushButton("Your Files")
+        self.filesButton.setToolTip(f"Open {appConfig.userDataDir} in File Explorer")
+        self.filesButton.clicked.connect(self.onFilesClicked)
+
         header = QHBoxLayout()
         header.addWidget(self.openButton)
         header.addWidget(self.clipLabel, stretch=1)
+        header.addWidget(self.filesButton)
 
         self.videoDisplay = VideoDisplay()
         self.videoDisplay.clear("Open a clip")
@@ -100,6 +114,23 @@ class ClipBrowser(QWidget):
         layout.addLayout(transport)
 
     # ------------------------------------------------------------ opening --
+
+    def onFilesClicked(self) -> None:
+        """Hand the folder to the system file manager.
+
+        as_uri() rather than a path, so this and the About box are demonstrably
+        opening the same thing. A frozen build's folder is seeded at first run,
+        but a machine where that never happened would otherwise get a button
+        that does nothing at all, which is worse than being told.
+        """
+        folder = appConfig.userDataDir
+        if not folder.is_dir():
+            self.statusMessage.emit(f"{folder} does not exist yet.")
+            return
+        if not self.opener(QUrl(folder.as_uri())):
+            self.statusMessage.emit(f"Could not open {folder}.")
+            return
+        self.statusMessage.emit(f"Opened {folder}")
 
     def onOpenClicked(self) -> None:
         startDir = (
