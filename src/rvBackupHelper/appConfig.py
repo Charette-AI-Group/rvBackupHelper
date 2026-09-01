@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 appName = "RV Backup Helper"
-appVersion = "0.1.0"
+appVersion = "0.1.1"
 organizationName = "Charette AI Group"
 
 # Help > About contents

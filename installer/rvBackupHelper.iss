@@ -15,7 +15,7 @@
 ; warning into a lie.
 
 #define AppName "RV Backup Helper"
-#define AppVersion "0.1.0"
+#define AppVersion "0.1.1"
 #define Publisher "Charette AI Group, LLC"
 #define AppUrl "https://github.com/Charette-AI-Group/rvBackupHelper"
 #define ExeName "rvBackupHelper.exe"
