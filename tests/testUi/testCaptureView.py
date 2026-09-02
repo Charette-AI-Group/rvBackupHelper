@@ -27,6 +27,22 @@ class FakeScanWorker(QObject):
     def start(self) -> None:
         self.startCalled = True
 
+class FakeGridWorker(QObject):
+    """Stands in for GridWorker so tests never open a serial port."""
+
+    finishedWithReply = Signal(bool, str)
+    errorOccurred = Signal(str)
+    finished = Signal()
+
+    def __init__(self, visible: bool, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self.visible = visible
+        self.startCalled = False
+
+    def start(self) -> None:
+        self.startCalled = True
+
+
 liveDevice = CameraDevice(
     index=0,
     label="HD Pro Webcam C920",
@@ -208,22 +224,68 @@ def testGridToggleReportsWhatTheBoardActuallySaid(qtbot) -> None:
     assert "grid off" in messages[-1]
 
 
-def testAFailedGridCommandPutsTheButtonBack(qtbot) -> None:
+def testAFailedGridCommandPutsTheButtonBack(qtbot, monkeypatch) -> None:
     """The board did not do as asked, so the button must not claim it did."""
+    monkeypatch.setattr(
+        "rvBackupHelper.ui.capture.captureView.GridWorker", FakeGridWorker
+    )
     view = CaptureView()
     qtbot.addWidget(view)
     messages: list[str] = []
     errors: list[tuple[str, str]] = []
     view.statusMessage.connect(messages.append)
     view.errorMessage.connect(lambda title, message: errors.append((title, message)))
-    view.gridToggle.setChecked(False)
 
+    # A click moves the button first, then the board is asked and refuses.
+    view.gridToggle.setChecked(True)
+    view.onGridToggleClicked()
     view.onGridFailed("No Arduino found.")
 
-    assert view.gridToggle.isChecked()
-    assert view.gridToggle.text() == gridOnText
+    assert not view.gridToggle.isChecked()
+    assert view.gridToggle.text() == gridOffText
     assert "No Arduino found." in messages[-1]
     # And in full, where it can be read whatever its length.
+    assert errors == [("Arduino", "No Arduino found.")]
+
+
+def testUploadingAsksTheBoardToPutTheGridBack(qtbot, monkeypatch) -> None:
+    """The step before an upload is recording with the grid blanked, and the
+    board keeps that in EEPROM across power cycles.
+
+    Left alone it comes up blank in the vehicle, on the barrel jack, with no
+    PC anywhere to ask it for the grid - which is where this was found.
+    """
+    monkeypatch.setattr(
+        "rvBackupHelper.ui.capture.captureView.GridWorker", FakeGridWorker
+    )
+    view = CaptureView()
+    qtbot.addWidget(view)
+    view.gridToggle.setChecked(False)
+
+    view.onSketchUploaded()
+
+    assert view.gridWorker.visible is True
+    assert view.gridWorker.startCalled
+    assert view.gridToggle.text() == gridOnText
+
+
+def testARefusedGridAfterUploadIsSaidOutLoud(qtbot, monkeypatch) -> None:
+    """Failing quietly here would leave exactly the blank overlay this
+    prevents, so the button goes back and the failure is reported."""
+    monkeypatch.setattr(
+        "rvBackupHelper.ui.capture.captureView.GridWorker", FakeGridWorker
+    )
+    view = CaptureView()
+    qtbot.addWidget(view)
+    errors: list[tuple[str, str]] = []
+    view.errorMessage.connect(lambda title, message: errors.append((title, message)))
+    view.gridToggle.setChecked(False)
+
+    view.onSketchUploaded()
+    view.onGridFailed("No Arduino found.")
+
+    assert not view.gridToggle.isChecked()
+    assert view.gridToggle.text() == gridOffText
     assert errors == [("Arduino", "No Arduino found.")]
 
 

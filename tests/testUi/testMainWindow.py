@@ -19,6 +19,7 @@ from rvBackupHelper.services.board.toolchainService import (
     ToolchainService,
 )
 from rvBackupHelper.services.settingsService import SettingsService
+from rvBackupHelper.ui.capture.captureView import CaptureView
 from rvBackupHelper.ui.mainWindow import MainWindow
 
 
@@ -400,3 +401,19 @@ def testTheHardwareVerdictReachesTheBarAndADialog(qtbot, monkeypatch) -> None:
 
     assert mainWindow.statusBar().currentMessage() == "No Arduino found."
     assert shown == [report]
+
+
+def testAnUploadHandsTheGridBackToTheCaptureTab(qtbot, monkeypatch) -> None:
+    """The tabs are wired for it, because the board keeps a blanked grid in
+    EEPROM and would otherwise come up with no lines in the vehicle."""
+    called: list[bool] = []
+    # Patched before the window is built, so the connection binds to this.
+    monkeypatch.setattr(
+        CaptureView, "onSketchUploaded", lambda self: called.append(True)
+    )
+    mainWindow = MainWindow()
+    qtbot.addWidget(mainWindow)
+
+    mainWindow.calibrationView.onUploadFinished("Sketch uses 12000 bytes")
+
+    assert called == [True]

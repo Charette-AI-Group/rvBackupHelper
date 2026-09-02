@@ -126,7 +126,9 @@ the camera passes through clean. **Record calibration footage with it off** — 
 into the clip sits right on top of the markings you need to click afterwards. It needs the
 generated grid sketch flashed (the bring-up sketch takes no commands) and takes a couple of
 seconds, because opening a serial port resets the board. The state is kept in the Arduino's
-EEPROM, so it survives that reset, an unplug, and closing the app.
+EEPROM, so it survives that reset, an unplug, closing the app, and a reflash — which is why a
+successful **Upload to Arduino** asks for the grid back, so a board blanked for a recording
+does not reach the vehicle still blank.
 
 Starting capture on a device with no signal is fine: the preview shows "Waiting for video
 signal" and starts as soon as video arrives, which is what an RV camera powered only in

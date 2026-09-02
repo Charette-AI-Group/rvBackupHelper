@@ -85,6 +85,10 @@ class CalibrationView(QWidget):
     statusMessage = Signal(str)
     # Failures, as (title, whole message). The status bar cannot hold them.
     errorMessage = Signal(str, str)
+    # A board was successfully flashed. The Capture tab listens, because the
+    # grid it may have left switched off is the board's business, not this
+    # panel's.
+    uploadSucceeded = Signal()
 
     def __init__(
         self,
@@ -383,6 +387,7 @@ class CalibrationView(QWidget):
 
     def onUploadFinished(self, summary: str) -> None:
         self.statusMessage.emit(summary)
+        self.uploadSucceeded.emit()
 
     def reportError(self, title: str, message: str) -> None:
         """A headline on the bar, the whole thing in a dialog.

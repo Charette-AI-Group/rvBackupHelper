@@ -64,6 +64,13 @@ class MainWindow(QMainWindow):
         self.captureView.errorMessage.connect(self.showError)
         self.calibrationView.errorMessage.connect(self.showError)
         self.captureView.clipRecorded.connect(self.onClipRecorded)
+        # Uploading is the last step of a calibration round and the grid was
+        # blanked for the recording that preceded it. The board remembers that
+        # across power cycles, so the flash has to hand the grid back or the
+        # vehicle gets a clean picture and no lines.
+        self.calibrationView.uploadSucceeded.connect(
+            self.captureView.onSketchUploaded
+        )
 
         self.buildMenuBar()
 

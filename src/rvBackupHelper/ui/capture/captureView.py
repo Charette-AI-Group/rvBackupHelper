@@ -49,6 +49,10 @@ class CaptureView(QWidget):
         self.captureWorker: CaptureWorker | None = None
         self.scanWorker: DeviceScanWorker | None = None
         self.gridWorker: GridWorker | None = None
+        # Where the toggle stood before the request in flight, so a refusal
+        # can put it back. Not simply the inverse of the request: an upload
+        # asks for the grid on when it may already be on.
+        self.gridBeforeRequest = False
         self.devices: list[CameraDevice] = []
         self.activeDevice: CameraDevice | None = None
         self.recordingPath: Path | None = None
@@ -298,19 +302,43 @@ class CaptureView(QWidget):
     # -------------------------------------------------------- the board ---
 
     def onGridToggleClicked(self) -> None:
+        # A checkable button has already moved by the time this runs, so what
+        # it was showing before the click is the inverse of what it shows now.
+        wanted = self.gridToggle.isChecked()
+        self.requestGrid(wanted, previous=not wanted)
+
+    def requestGrid(self, visible: bool, previous: bool) -> None:
+        """Ask the board to show or hide the grid, from a click or otherwise.
+
+        `previous` is where the button goes back to if the board refuses, and
+        is passed rather than read here because a click has already moved it.
+        """
         if self.gridWorker is not None:
             return
-        wanted = self.gridToggle.isChecked()
+        self.gridBeforeRequest = previous
+        self.gridToggle.setChecked(visible)
+        self.updateGridToggleText()
         self.gridToggle.setEnabled(False)
         self.statusMessage.emit(
-            f"Asking the Arduino to {'show' if wanted else 'hide'} the grid..."
+            f"Asking the Arduino to {'show' if visible else 'hide'} the grid..."
         )
-        worker = GridWorker(wanted, parent=self)
+        worker = GridWorker(visible, parent=self)
         worker.finishedWithReply.connect(self.onGridReply)
         worker.errorOccurred.connect(self.onGridFailed)
         worker.finished.connect(self.onGridFinished)
         self.gridWorker = worker
         worker.start()
+
+    def onSketchUploaded(self) -> None:
+        """Put the grid back up after a flash.
+
+        An upload is the last step of a calibration round, and the step before
+        it was recording footage with the grid deliberately blanked. The board
+        keeps that in EEPROM and re-applies it on every start, so without this
+        the next power-up - in the vehicle, on the barrel jack, with no PC
+        anywhere - comes up with no grid and no way to ask for one.
+        """
+        self.requestGrid(True, previous=self.gridToggle.isChecked())
 
     def onGridReply(self, visible: bool, reply: str) -> None:
         self.gridToggle.setChecked(visible)
@@ -319,7 +347,7 @@ class CaptureView(QWidget):
 
     def onGridFailed(self, message: str) -> None:
         # Put the button back where it was: the board did not do as asked.
-        self.gridToggle.setChecked(not self.gridToggle.isChecked())
+        self.gridToggle.setChecked(self.gridBeforeRequest)
         self.updateGridToggleText()
         self.reportError("Arduino", message)
 

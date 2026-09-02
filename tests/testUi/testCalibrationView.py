@@ -456,3 +456,14 @@ def testEveryCalibrationFailureReachesTheDialog(
     title, message = errors[-1]
     assert title == "Save failed"
     assert "read-only" in message
+
+
+def testASuccessfulUploadAnnouncesItself(view: CalibrationView) -> None:
+    """The Capture tab listens for this, so it can hand the grid back to a
+    board that was last told to blank it."""
+    announced: list[bool] = []
+    view.uploadSucceeded.connect(lambda: announced.append(True))
+
+    view.onUploadFinished("Sketch uses 12000 bytes")
+
+    assert announced == [True]

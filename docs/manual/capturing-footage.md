@@ -72,8 +72,10 @@ were indistinguishable from the measuring marks.
 
 It takes a couple of seconds, because opening a serial port resets the Arduino
 and the board has to boot before it can answer. The state is kept in the
-Arduino's own EEPROM, so it survives that reset, unplugging the board, and
-closing the application.
+Arduino's own EEPROM, so it survives that reset, unplugging the board, closing
+the application, and a reflash. That last one is why a successful **Upload to
+Arduino** asks for the grid back: otherwise a board blanked for a recording
+would reach the vehicle still blanked.
 
 > **Trap — the toggle needs the generated grid sketch on the board.** The
 > bring-up diagnostic accepts no commands. If it is what is flashed, the button

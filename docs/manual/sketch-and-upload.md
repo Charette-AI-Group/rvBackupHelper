@@ -103,6 +103,12 @@ arduino-cli compile --fqbn arduino:avr:uno --upload --port COM3 --verify arduino
 Success is quiet: `arduino-cli` prints only `New upload port: COM3 (serial)` and
 exits zero. The absence of progress output is not a failure.
 
+> **A hand flash does not turn the grid back on.** That is the app's doing, not
+> the sketch's, and `arduino-cli` knows nothing about it. If the overlay was
+> blanked for a recording it is still blanked afterwards, so finish with
+> **Arduino Grid → On** on the Capture tab, or the board goes to the vehicle
+> showing nothing.
+
 ## Changing what the grid looks like
 
 A few choices live in `src/rvBackupHelper/appConfig.py` rather than in the
@@ -122,10 +128,18 @@ is.
 
 ## Tips and traps
 
-> **Trap — the grid must be turned back on.** If you blanked the overlay to
-> record calibration footage, it is still blanked. **Arduino Grid → On** on the
-> Capture tab. The setting lives in the board's EEPROM and survives everything,
-> including a reflash of the same sketch.
+> **Upload turns the grid back on for you.** Blanking the overlay to record
+> calibration footage writes that state into the board's EEPROM, where it
+> survives a reflash and every power cycle after it. A board flashed at the end
+> of a calibration round therefore used to come up blank in the vehicle — on the
+> barrel jack, with no PC anywhere to ask it for the grid. A successful **Upload
+> to Arduino** now asks the board to show the grid, and the Capture tab's toggle
+> follows whatever the board answers.
+>
+> **If that step fails, it says so, and it must not be waved through.** The
+> flash itself still succeeded, so the board is running the new grid with the
+> overlay still blanked. Put it right with **Arduino Grid → On** on the Capture
+> tab before the board leaves the desk.
 
 > **Trap — a torn overlay means the build and the jumpers disagree**, not broken
 > hardware. See [Hardware setup](hardware-setup.md#the-two-settings-that-must-agree-with-your-build).

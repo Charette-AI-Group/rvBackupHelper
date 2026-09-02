@@ -66,6 +66,11 @@ the overlay lands on the real rear view before trusting any measured line.
 
    Check the port with `arduino-cli board list` — it is unlikely to be COM3 on the laptop.
 
+7. **Confirm the grid is on before packing up.** Step 3 blanked it, the board keeps that in
+   EEPROM, and a hand flash does not undo it — only the app's **Upload to Arduino** does.
+   **Arduino Grid → On** on the Capture tab, and look at the picture. A board that leaves the
+   desk blanked shows nothing in the vehicle, and there is no PC out there to fix it with.
+
 ## Laptop prerequisites — do these before leaving
 
 Nothing here downloads quickly on campground wifi.
